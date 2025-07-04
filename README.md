@@ -1,0 +1,1 @@
+# Drag2Anki_JP
