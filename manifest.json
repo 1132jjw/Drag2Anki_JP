@@ -1,0 +1,60 @@
+{
+  "manifest_version": 3,
+  "name": "Drag2Anki_JP",
+  "version": "1.0.0",
+  "description": "일본어 단어를 드래그하여 후리가나, 뜻, 한자 정보를 확인하고 Anki에 저장하는 크롬 익스텐션",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting",
+    "contextMenus",
+    "webRequest"
+  ],
+  "host_permissions": [
+    "http://localhost:8765/*",
+    "https://jisho.org/*",
+    "https://api.openai.com/*",
+    "https://kanjiapi.dev/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_end"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Drag2Anki_JP 설정",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "commands": {
+    "toggle_extension": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+D"
+      },
+      "description": "익스텐션 토글"
+    }
+  }
+}
