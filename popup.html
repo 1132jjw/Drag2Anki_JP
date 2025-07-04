@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drag2Anki_JP 설정</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🀄 Drag2Anki_JP</h1>
+            <p class="subtitle">일본어 학습 도우미</p>
+        </div>
+
+        <div class="content">
+            <div class="section">
+                <h2>🔗 연결 설정</h2>
+
+                <div class="form-group">
+                    <label for="ankiUrl">Anki Connect URL</label>
+                    <input type="text" id="ankiUrl" placeholder="http://localhost:8765">
+                    <small>Anki Connect 애드온의 URL을 입력하세요</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="openaiKey">OpenAI API Key (선택사항)</label>
+                    <input type="password" id="openaiKey" placeholder="sk-...">
+                    <small>한국어 번역을 위한 OpenAI API 키 (없으면 영어 뜻만 표시)</small>
+                </div>
+
+                <button id="testConnection" class="test-btn">연결 테스트</button>
+                <div id="connectionStatus" class="status"></div>
+            </div>
+
+            <div class="section">
+                <h2>📋 Anki 설정</h2>
+
+                <div class="form-group">
+                    <label for="deckName">덱 이름</label>
+                    <input type="text" id="deckName" placeholder="Japanese">
+                </div>
+
+                <div class="form-group">
+                    <label for="noteType">노트 타입</label>
+                    <input type="text" id="noteType" placeholder="Basic">
+                </div>
+
+                <div class="form-group">
+                    <label>필드 매핑</label>
+                    <div class="field-mapping">
+                        <div class="mapping-item">
+                            <span>단어</span>
+                            <input type="text" id="fieldWord" placeholder="Front">
+                        </div>
+                        <div class="mapping-item">
+                            <span>뜻</span>
+                            <input type="text" id="fieldMeaning" placeholder="Back">
+                        </div>
+                        <div class="mapping-item">
+                            <span>읽기</span>
+                            <input type="text" id="fieldReading" placeholder="Reading">
+                        </div>
+                        <div class="mapping-item">
+                            <span>한자</span>
+                            <input type="text" id="fieldKanji" placeholder="Kanji">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>🎨 UI 설정</h2>
+
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="darkMode">
+                        <label for="darkMode">다크 모드</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="fontSize">폰트 크기</label>
+                    <div class="slider-group">
+                        <input type="range" id="fontSize" min="12" max="20" value="14">
+                        <span id="fontSizeValue">14px</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="cacheEnabled">
+                        <label for="cacheEnabled">캐시 활성화</label>
+                    </div>
+                    <small>단어 검색 결과를 캐시하여 빠른 로딩 (24시간)</small>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>⌨️ 단축키</h2>
+
+                <div class="form-group">
+                    <label for="shortcut">단축키</label>
+                    <input type="text" id="shortcut" placeholder="Ctrl+Shift+D" readonly>
+                    <small>익스텐션 토글 단축키 (Chrome 설정에서 변경 가능)</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <button id="saveSettings" class="save-btn">설정 저장</button>
+            <button id="resetSettings" class="reset-btn">기본값 복원</button>
+        </div>
+
+        <div class="info">
+            <h3>사용법</h3>
+            <ol>
+                <li>웹페이지에서 일본어 단어를 드래그하세요</li>
+                <li>팝업에서 후리가나, 뜻, 한자 정보를 확인하세요</li>
+                <li>"Anki에 저장" 버튼을 클릭하여 카드를 저장하세요</li>
+            </ol>
+
+            <h3>주의사항</h3>
+            <ul>
+                <li>Anki가 실행 중이어야 합니다</li>
+                <li>Anki Connect 애드온이 설치되어 있어야 합니다</li>
+                <li>OpenAI API 키가 없으면 영어 뜻만 표시됩니다</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
