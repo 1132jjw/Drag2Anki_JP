@@ -192,10 +192,20 @@
                 ]);
 
                 wordInfo = {
-                    jisho: jishoData.status === 'fulfilled' ? jishoData.value : null,
-                    translation: translationData.status === 'fulfilled' ? translationData.value : null,
-                    kanji: kanjiData.status === 'fulfilled' ? kanjiData.value : null
+                    jisho: safeValue(jishoData),
+                    translation: safeValue(translationData),
+                    kanji: safeValue(kanjiData)
                 };
+
+                if (!wordInfo.jisho) {
+                    throw new Error('Jisho 데이터가 없습니다.');
+                }
+                if (!wordInfo.translation) {
+                    wordInfo.translation = '번역 정보가 없습니다.';
+                }
+                if (!wordInfo.kanji) {
+                    wordInfo.kanji = null;
+                }
 
                 // 캐시 저장
                 if (settings.cacheEnabled) {
@@ -266,6 +276,13 @@
         }
 
         return kanjiData;
+    }
+
+    function safeValue(data) {
+        if (data && data.status === 'fulfilled' && data.value && !data.value.error) {
+            return data.value;
+        }
+        return null;
     }
 
     function displayWordInfo(wordInfo) {
