@@ -52,12 +52,13 @@
 
         // 클릭 이벤트 (팝업 외부 클릭 시 닫기)
         document.addEventListener('click', handleDocumentClick);
-
-        // 스크롤 이벤트 (팝업 숨기기)
-        document.addEventListener('scroll', hidePopup);
     }
 
-    function handleTextSelection(event) {
+function handleTextSelection(event) {
+    // 팝업이 열려있으면 무시
+    if (popup && popup.contains(event.target)) return;
+
+    setTimeout(() => {
         const selection = window.getSelection();
         const selectedText = selection.toString().trim();
 
@@ -68,7 +69,9 @@
         } else {
             hidePopup();
         }
-    }
+    }, 20); // 10~30ms 정도면 충분
+}
+
 
     function handleKeyDown(event) {
         if (event.ctrlKey && event.shiftKey && event.code === 'KeyD') {
@@ -117,7 +120,7 @@
             </div>
             <div class="popup-content">
                 <div class="loading">정보를 불러오는 중...</div>
-                <div class="tabs" style="display: none;">
+                <div class="tabs">
                     <button class="tab-btn active" data-tab="meaning">뜻</button>
                     <button class="tab-btn" data-tab="kanji">한자</button>
                 </div>
@@ -196,16 +199,7 @@
                     translation: safeValue(translationData),
                     kanji: safeValue(kanjiData)
                 };
-
-                if (!wordInfo.jisho) {
-                    throw new Error('Jisho 데이터가 없습니다.');
-                }
-                if (!wordInfo.translation) {
-                    wordInfo.translation = '번역 정보가 없습니다.';
-                }
-                if (!wordInfo.kanji) {
-                    wordInfo.kanji = null;
-                }
+                console.log('단어 정보:', wordInfo);
 
                 // 캐시 저장
                 if (settings.cacheEnabled) {
@@ -295,8 +289,8 @@
         tabsEl.style.display = 'flex';
 
         // 뜻 탭 내용
-        let readingHtml = '';
-        let meaningHtml = '';
+        let readingHtml = '<div class="reading-text">정보가 없습니다.</div>';
+        let meaningHtml = '<div class="meaning-text">정보가 없습니다.</div>';
 
         if (wordInfo.jisho) {
             const reading = wordInfo.jisho.japanese[0];
@@ -336,7 +330,7 @@
             kanjiHtml = '<div class="no-kanji">한자 정보가 없습니다.</div>';
         }
 
-        kanjiTab.querySelector('.kanji-info').innerHTML = kanjiHtml;
+        document.querySelector('#kanji-tab .kanji-info').innerHTML = kanjiHtml;
     }
 
     function displayError(message) {
@@ -345,6 +339,7 @@
     }
 
     function switchTab(tabName) {
+        console.log(`Switching to tab: ${tabName}`);
         popup.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
         popup.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
 
