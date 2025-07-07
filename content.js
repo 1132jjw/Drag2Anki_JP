@@ -387,21 +387,22 @@ function handleTextSelection(event) {
         };
     }
 
-    async function checkDuplicate(text) {
-        const response = await fetch(settings.ankiConnectUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                action: 'findNotes',
-                version: 6,
+    function checkDuplicate(text) {
+        return new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage({
+                type: 'CHECK_DUPLICATE',
+                ankiConnectUrl: settings.ankiConnectUrl,
                 params: {
                     query: `deck:"${settings.deckName}" ${settings.fieldMapping.word}:"${text}"`
                 }
-            })
+            }, response => {
+                if (response && response.success) {
+                    resolve(response.result); // findNotes 결과
+                } else {
+                    reject(response ? response.error : 'Anki 중복 검사 오류');
+                }
+            });
         });
-
-        const data = await response.json();
-        return data.result || [];
     }
 
     function createAnkiNote(text, wordInfo) {
@@ -419,20 +420,24 @@ function handleTextSelection(event) {
         };
     }
 
-    async function addNoteToAnki(note) {
-        const response = await fetch(settings.ankiConnectUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                action: 'addNote',
-                version: 6,
-                params: { note: note }
-            })
+    function addNoteToAnki(note) {
+        return new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage({
+                type: 'ADD_TO_ANKI',
+                ankiConnectUrl: settings.ankiConnectUrl, // 예: 'http://localhost:8765'
+                params: {
+                    note: note
+                }
+            }, response => {
+                if (response && response.success) {
+                    resolve(response.result);
+                } else {
+                    reject(response ? response.error : "Anki 저장 오류");
+                }
+            });
         });
-
-        const data = await response.json();
-        return data.result !== null;
     }
+
 
     function showSaveSuccess() {
         const saveBtn = popup.querySelector('.save-btn');

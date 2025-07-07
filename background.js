@@ -111,6 +111,46 @@ async function testAnkiConnection(url) {
     }
 }
 
+// Anki 카드 중복 확인 요청 처리
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.type === 'CHECK_DUPLICATE') {
+        fetch(request.ankiConnectUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'findNotes',
+                version: 6,
+                params: request.params
+            })
+        })
+        .then(response => response.json())
+        .then(data => sendResponse({ success: true, result: data.result }))
+        .catch(error => sendResponse({ success: false, error: error.message }));
+        return true; // 비동기 응답 명시
+    }
+    else if (request.type === 'ADD_TO_ANKI') {
+        // AnkiConnect로 fetch
+        fetch('http://localhost:8765/', {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                action: "addNote",
+                version: 6,
+                params: request.params
+            }),
+        })
+        .then(res => res.json())
+        .then(data => {
+            sendResponse({ success: true, result: data.result });
+        })
+        .catch(err => sendResponse({ success: false, error: err.message }));
+
+        // true를 리턴하면 sendResponse를 비동기로 사용 가능
+        return true;
+    }
+});
+
+
 // CORS 문제 해결을 위한 fetch 프록시
 async function fetchWithCORS(url, options = {}) {
     try {
