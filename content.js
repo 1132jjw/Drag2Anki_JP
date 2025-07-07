@@ -215,7 +215,7 @@
     }
 
     async function fetchJishoData(text) {
-        const response = await fetch(`https://jisho.org/api/v1/search/words?keyword=${encodeURIComponent(text)}`);
+        const response = await fetch(`https://drag2ankijpproxy-production.up.railway.app/jisho?word=${encodeURIComponent(text)}`);
         const data = await response.json();
         return data.data[0] || null;
     }
