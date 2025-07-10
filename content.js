@@ -354,9 +354,7 @@ function handleTextSelection(event) {
             // 중복 체크
             const duplicateCheck = await checkDuplicate(text);
             if (duplicateCheck.length > 0) {
-                if (!confirm('이미 Anki에 저장된 단어입니다. 다시 저장하시겠습니까?')) {
-                    return;
-                }
+                return showSaveError('이미 Anki에 저장된 단어입니다.');
             }
 
             // 카드 생성
@@ -454,7 +452,7 @@ function handleTextSelection(event) {
     function showSaveError(message) {
         const saveBtn = popup.querySelector('.save-btn');
         const originalText = saveBtn.textContent;
-        saveBtn.textContent = '오류 발생';
+        saveBtn.textContent = message || '저장 실패';
         saveBtn.style.backgroundColor = '#f44336';
 
         setTimeout(() => {
