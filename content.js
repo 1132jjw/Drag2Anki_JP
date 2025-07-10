@@ -95,6 +95,10 @@ function handleTextSelection(event) {
         return japaneseRegex.test(text);
     }
 
+    function isKanaOnly(text) {
+        const kanaRegex = /^[\u3040-\u309F\u30A0-\u30FF]+$/;
+        return kanaRegex.test(text);}
+
     function showPopup(text, rect) {
         hidePopup();
 
@@ -188,15 +192,15 @@ function handleTextSelection(event) {
 
             if (!wordInfo) {
                 // API 요청
-                const [jishoData, translationData, kanjiData] = await Promise.allSettled([
+                const [jishoData, llmMeaning, kanjiData] = await Promise.allSettled([
                     fetchJishoData(text),
-                    fetchTranslation(text),
+                    fetchLLMMeaning(text),
                     fetchKanjiData(text)
                 ]);
 
                 wordInfo = {
                     jisho: safeValue(jishoData),
-                    translation: safeValue(translationData),
+                    llmMeaning: safeValue(llmMeaning),
                     kanji: safeValue(kanjiData)
                 };
                 console.log('단어 정보:', wordInfo);
@@ -224,7 +228,7 @@ function handleTextSelection(event) {
         return data.data[0] || null;
     }
 
-    async function fetchTranslation(text) {
+    async function fetchLLMMeaning(text) {
         if (!settings.openaiApiKey) {
             return null;
         }
@@ -236,11 +240,35 @@ function handleTextSelection(event) {
                 'Authorization': `Bearer ${settings.openaiApiKey}`
             },
             body: JSON.stringify({
-                model: 'gpt-3.5-turbo',
+                model: 'gpt-4.1-mini-2025-04-14',
                 messages: [
                     {
                         role: 'system',
-                        content: '일본어 단어를 한국어로 번역해주세요. 간단하고 명확한 뜻만 답변해주세요.'
+                        content: `
+                            당신은 일본어 단어를 한국어로 번역하는 사전 역할을 합니다.
+
+                            - 입력받은 일본어 단어의 품사(명사, 동사, 형용사, 부사 등)를 구분해서 출력하세요.
+                            - 각 품사별로 의미가 하나뿐이어도 반드시 '1.'과 같이 숫자를 붙여서 출력하세요.
+                            - 의미가 여러 개라면 1, 2, 3처럼 숫자를 붙여 줄바꿈하여 나열하세요.
+                            - 각 뜻은 되도록 사전적인 표현으로 간결하게 정리하세요.
+
+                            아래는 출력 예시입니다.
+
+                            예시)
+                            input: 偶然
+
+                            output:
+                            명사  
+                            1. 우연.  
+                            2. (철학) ((contingency)) 우연성; 어떤 사물이 인과율(因果律)에 근거하지 않는 성질.
+
+                            부사  
+                            1. 우연히.
+
+                            ===
+
+                            아래의 형식을 꼭 지켜서, 입력받은 일본어 단어의 뜻을 한국어로 알려주세요.
+                    `,
                     },
                     {
                         role: 'user',
@@ -299,11 +327,12 @@ function handleTextSelection(event) {
             }
 
             const meanings = wordInfo.jisho.senses[0].english_definitions;
-            meaningHtml = `<div class="meaning-text">${meanings.join(', ')}</div>`;
-        }
+            // 한국어 뜻이 있다면 한국어 뜻으로 표시
+            const meaningText = wordInfo.llmMeaning
+                ? wordInfo.llmMeaning
+                : meanings.join(', ');
 
-        if (wordInfo.translation) {
-            meaningHtml += `<div class="korean-meaning">한국어: ${wordInfo.translation}</div>`;
+            meaningHtml = `<div class="meaning-text">${meaningText.replace(/\n/g, '<br>')}</div>`;
         }
 
         meaningTab.querySelector('.reading').innerHTML = readingHtml;
@@ -405,8 +434,12 @@ function handleTextSelection(event) {
 
     function createAnkiNote(text, wordInfo) {
         const fields = {};
+        let meaning = wordInfo.meaning || '';
+        
+        if (!isKanaOnly(text)) {
+            meaning = (wordInfo.reading || '') + '\n\n' + meaning;
+        }
         fields[settings.fieldMapping.word] = text;
-        fields[settings.fieldMapping.meaning] = wordInfo.meaning + (wordInfo.koreanMeaning ? '<br>' + wordInfo.koreanMeaning : '');
         fields[settings.fieldMapping.reading] = wordInfo.reading;
         fields[settings.fieldMapping.kanji] = wordInfo.kanji;
 
