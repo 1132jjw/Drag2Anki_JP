@@ -56,5 +56,11 @@
       },
       "description": "익스텐션 토글"
     }
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [ "data/hanja.json" ],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }

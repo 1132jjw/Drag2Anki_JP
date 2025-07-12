@@ -283,18 +283,30 @@ function handleTextSelection(event) {
         return data.choices[0].message.content;
     }
 
+    async function loadHanjaDict() {
+        const response = await fetch(chrome.runtime.getURL('data/hanja.json'));
+        return await response.json();
+    }
+
     async function fetchKanjiData(text) {
         const kanjiList = text.match(/[\u4E00-\u9FAF]/g) || [];
         const kanjiData = [];
+        const hanjaDict = await loadHanjaDict();
 
         for (const kanji of kanjiList) {
+            let data = {};
             try {
                 const response = await fetch(`https://kanjiapi.dev/v1/kanji/${kanji}`);
-                const data = await response.json();
-                kanjiData.push(data);
+                data = await response.json();
             } catch (error) {
                 console.error(`한자 정보 로드 오류 (${kanji}):`, error);
             }
+
+            const koreanHanjaInfo = hanjaDict[kanji] || null;
+            data.korean = koreanHanjaInfo
+
+            console.log(`한자 정보 (${kanji}):`, data);
+            kanjiData.push(data);
         }
 
         return kanjiData;
@@ -346,10 +358,11 @@ function handleTextSelection(event) {
                     <div class="kanji-item">
                         <div class="kanji-char">${kanji.kanji}</div>
                         <div class="kanji-details">
-                            <div class="kanji-meanings">뜻: ${kanji.meanings.join(', ')}</div>
+                            <div class="kanji-meanings">${kanji.korean.meaning} ${kanji.korean.reading}</div>
                             <div class="kanji-readings">
                                 <span>음독: ${kanji.on_readings.join(', ')}</span>
                                 <span>훈독: ${kanji.kun_readings.join(', ')}</span>
+                                <span>JLPT: ${kanji.jlpt}</span>
                             </div>
                         </div>
                     </div>
