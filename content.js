@@ -62,7 +62,7 @@ function handleTextSelection(event) {
         const selection = window.getSelection();
         const selectedText = selection.toString().trim();
 
-        if (selectedText && isJapaneseText(selectedText)) {
+        if (selectedText && isJapaneseTextOnly(selectedText)) {
             const range = selection.getRangeAt(0);
             const rect = range.getBoundingClientRect();
             showPopup(selectedText, rect);
@@ -90,9 +90,9 @@ function handleTextSelection(event) {
         }
     }
 
-    function isJapaneseText(text) {
-        const japaneseRegex = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/;
-        return japaneseRegex.test(text);
+    function isJapaneseTextOnly(text) {
+        const japaneseOnlyRegex = /^[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]+$/;
+        return japaneseOnlyRegex.test(text);
     }
 
     function isKanaOnly(text) {
@@ -461,7 +461,10 @@ function handleTextSelection(event) {
         if (!isKanaOnly(text)) {
             meaning = (wordInfo.reading || '') + '\n\n' + meaning;
         }
+        console.log('raw meaning:', meaning);
+        console.log('raw meaning JSON:', JSON.stringify(meaning));
         fields[settings.fieldMapping.word] = text;
+        fields[settings.fieldMapping.meaning] = meaning.replace(/\n/g, '<br>');
         fields[settings.fieldMapping.reading] = wordInfo.reading;
         fields[settings.fieldMapping.kanji] = wordInfo.kanji;
 
