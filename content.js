@@ -203,8 +203,7 @@ function handleTextSelection(event) {
                     llmMeaning: safeValue(llmMeaning),
                     kanji: safeValue(kanjiData)
                 };
-                console.log('단어 정보:', wordInfo);
-
+                
                 // 한국 한자 정보가 없는 경우 llmmeaning을 한국 한자 정보로 사용
                 for (const kanji of wordInfo.kanji || []) {
                     if (!kanji.korean) {
@@ -214,6 +213,7 @@ function handleTextSelection(event) {
                         };
                     }
                 }
+                console.log('단어 정보:', wordInfo);
 
                 // 캐시 저장
                 if (settings.cacheEnabled) {
@@ -428,10 +428,17 @@ function handleTextSelection(event) {
         const meaningTab = popup.querySelector('#meaning-tab');
         const kanjiTab = popup.querySelector('#kanji-tab');
 
+        function getTextWithNewlines(element) {
+            if (!element) return '';
+            let html = element.innerHTML
+                .replace(/<br\s*\/?>/gi, '\n');
+            html = html.replace(/<[^>]+>/g, '');
+            return html;
+        }
+
         return {
             reading: meaningTab.querySelector('.reading-text')?.textContent || '',
-            meaning: meaningTab.querySelector('.meaning-text')?.textContent || '',
-            koreanMeaning: meaningTab.querySelector('.korean-meaning')?.textContent || '',
+            meaning: getTextWithNewlines(meaningTab.querySelector('.meaning-text')),
             kanji: kanjiTab.querySelector('.kanji-info')?.textContent || ''
         };
     }
@@ -461,12 +468,8 @@ function handleTextSelection(event) {
         if (!isKanaOnly(text)) {
             meaning = (wordInfo.reading || '') + '\n\n' + meaning;
         }
-        console.log('raw meaning:', meaning);
-        console.log('raw meaning JSON:', JSON.stringify(meaning));
-        fields[settings.fieldMapping.word] = text;
+        fields[settings.fieldMapping.word] = text + ' ';
         fields[settings.fieldMapping.meaning] = meaning.replace(/\n/g, '<br>');
-        fields[settings.fieldMapping.reading] = wordInfo.reading;
-        fields[settings.fieldMapping.kanji] = wordInfo.kanji;
 
         return {
             deckName: settings.deckName,

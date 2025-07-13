@@ -13,9 +13,7 @@ chrome.runtime.onInstalled.addListener(() => {
                 noteType: 'Basic',
                 fieldMapping: {
                     word: 'Front',
-                    meaning: 'Back',
-                    reading: 'Reading',
-                    kanji: 'Kanji'
+                    meaning: 'Back'
                 },
                 darkMode: false,
                 fontSize: 14,
