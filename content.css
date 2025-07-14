@@ -329,6 +329,47 @@
     border-top-color: #4a5568;
 }
 
+.meaning-text-with-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.kanji-save-btn {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: 'Noto Sans KR', 'Noto Sans JP', sans-serif;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.08);
+    transition: all 0.2s;
+    outline: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.kanji-save-btn:hover {
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+    transform: translateY(-1px) scale(1.04);
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.18);
+}
+.kanji-save-btn:active {
+    transform: scale(0.98);
+}
+.drag2anki-popup.dark-mode .kanji-save-btn {
+    background: linear-gradient(135deg, #4a5568 0%, #667eea 100%);
+    color: #e2e8f0;
+}
+.drag2anki-popup.dark-mode .kanji-save-btn:hover {
+    background: linear-gradient(135deg, #667eea 0%, #4a5568 100%);
+}
+
 /* 반응형 */
 @media (max-width: 480px) {
     .drag2anki-popup {

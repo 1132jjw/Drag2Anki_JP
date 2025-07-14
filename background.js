@@ -126,6 +126,49 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         .catch(error => sendResponse({ success: false, error: error.message }));
         return true; // 비동기 응답 명시
     }
+    else if (request.type === 'CHECK_DUPLICATE_EXACT') {
+        // 정확히 일치하는 중복 검사
+        (async () => {
+            try {
+                // 1. findNotes로 note id 찾기
+                const findRes = await fetch(request.ankiConnectUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'findNotes',
+                        version: 6,
+                        params: request.params
+                    })
+                });
+                const findData = await findRes.json();
+                const ids = findData.result;
+                if (!ids || ids.length === 0) {
+                    sendResponse({ success: true, isDuplicate: false });
+                    return;
+                }
+                // 2. notesInfo로 실제 필드값 확인
+                const infoRes = await fetch(request.ankiConnectUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'notesInfo',
+                        version: 6,
+                        params: { notes: ids }
+                    })
+                });
+                const infoData = await infoRes.json();
+                const fieldName = request.fieldName;
+                const text = request.text;
+                const isDuplicate = infoData.result.some(note =>
+                    (note.fields[fieldName]?.value?.trim() === text.trim())
+                );
+                sendResponse({ success: true, isDuplicate });
+            } catch (error) {
+                sendResponse({ success: false, error: error.message });
+            }
+        })();
+        return true;
+    }
     else if (request.type === 'ADD_TO_ANKI') {
         // AnkiConnect로 fetch
         fetch('http://localhost:8765/', {

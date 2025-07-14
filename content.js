@@ -22,6 +22,8 @@
         shortcut: 'Ctrl+Shift+D'
     };
 
+    let currentWordInfo = null; // 전역 선언
+
     // 캐시 시스템
     const cache = new Map();
     const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24시간
@@ -104,10 +106,10 @@ function handleTextSelection(event) {
 
         popup = createPopup(text, rect);
         document.body.appendChild(popup);
-
+        
         // 팝업 위치 조정
         adjustPopupPosition(popup, rect);
-
+        
         // 단어 정보 로드
         loadWordInfo(text);
     }
@@ -139,7 +141,7 @@ function handleTextSelection(event) {
                 </div>
             </div>
             <div class="popup-footer">
-                <button class="save-btn">Anki에 저장</button>
+                <button class="save-btn">Anki에 저장 [단어]</button>
             </div>
         `;
 
@@ -224,6 +226,7 @@ function handleTextSelection(event) {
                 }
             }
 
+            currentWordInfo = wordInfo; // wordInfo 저장
             displayWordInfo(wordInfo);
 
         } catch (error) {
@@ -362,17 +365,18 @@ function handleTextSelection(event) {
         // 한자 탭 내용
         let kanjiHtml = '';
         if (wordInfo.kanji && wordInfo.kanji.length > 0) {
-            wordInfo.kanji.forEach(kanji => {
+            wordInfo.kanji.forEach((kanji, idx) => {
                 kanjiHtml += `
-                    <div class="kanji-item">
+                    <div class="kanji-item" data-kanji-idx="${idx}">
                         <div class="kanji-char">${kanji.kanji}</div>
                         <div class="kanji-details">
-                            <div class="kanji-meanings">${kanji.korean.meaning} ${kanji.korean.reading}</div>
+                            <div class="kanji-meanings">${kanji.korean?.meaning || ''} ${kanji.korean?.reading || ''}</div>
                             <div class="kanji-readings">
-                                <span>음독: ${kanji.on_readings.join(', ')}</span>
-                                <span>훈독: ${kanji.kun_readings.join(', ')}</span>
-                                <span>JLPT: ${kanji.jlpt}</span>
+                                <span>음독: ${(kanji.on_readings||[]).join(', ')}</span>
+                                <span>훈독: ${(kanji.kun_readings||[]).join(', ')}</span>
+                                <span>JLPT: ${kanji.jlpt || ''}</span>
                             </div>
+                            <button class="kanji-save-btn" data-kanji-idx="${idx}">Anki에 저장 [한자]</button>
                         </div>
                     </div>
                 `;
@@ -382,6 +386,20 @@ function handleTextSelection(event) {
         }
 
         document.querySelector('#kanji-tab .kanji-info').innerHTML = kanjiHtml;
+        // 한자 저장 버튼 이벤트 위임 (뜻 탭용) 제거
+        // 한자 탭용 기존 이벤트 위임 유지
+        const kanjiInfoEl = document.querySelector('#kanji-tab .kanji-info');
+        if (kanjiInfoEl) {
+            kanjiInfoEl.addEventListener('click', async function(e) {
+                const btn = e.target.closest('.kanji-save-btn');
+                if (btn) {
+                    const idx = btn.getAttribute('data-kanji-idx');
+                    if (wordInfo.kanji && wordInfo.kanji[idx]) {
+                        await saveKanjiToAnki(wordInfo.kanji[idx], btn);
+                    }
+                }
+            });
+        }
     }
 
     function displayError(message) {
@@ -398,13 +416,33 @@ function handleTextSelection(event) {
         popup.querySelector(`#${tabName}-tab`).classList.add('active');
     }
 
+    // 정확히 일치하는 중복만 검사하는 함수 (background.js에 위임)
+    async function checkDuplicateExact(text) {
+        return new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage({
+                type: 'CHECK_DUPLICATE_EXACT',
+                ankiConnectUrl: settings.ankiConnectUrl,
+                params: { query: `"${text.trim()}"` },
+                fieldName: settings.fieldMapping.word,
+                text: text.trim()
+            }, response => {
+                if (response && response.success) {
+                    resolve(response.isDuplicate);
+                } else {
+                    reject(response ? response.error : 'Anki 중복 검사 오류');
+                }
+            });
+        });
+    }
+
     async function saveToAnki(text) {
         try {
-            const wordInfo = getCurrentWordInfo();
+            const wordInfo = currentWordInfo; // wordInfo 직접 사용
+            console.log('저장할 단어 정보:', wordInfo);
 
-            // 중복 체크
-            const duplicateCheck = await checkDuplicate(text);
-            if (duplicateCheck.length > 0) {
+            // 중복 체크 (정확히 일치하는 경우만)
+            const isDuplicate = await checkDuplicateExact(text);
+            if (isDuplicate) {
                 return showSaveError('이미 Anki에 저장된 단어입니다.');
             }
 
@@ -424,51 +462,14 @@ function handleTextSelection(event) {
         }
     }
 
-    function getCurrentWordInfo() {
-        const meaningTab = popup.querySelector('#meaning-tab');
-        const kanjiTab = popup.querySelector('#kanji-tab');
-
-        function getTextWithNewlines(element) {
-            if (!element) return '';
-            let html = element.innerHTML
-                .replace(/<br\s*\/?>/gi, '\n');
-            html = html.replace(/<[^>]+>/g, '');
-            return html;
-        }
-
-        return {
-            reading: meaningTab.querySelector('.reading-text')?.textContent || '',
-            meaning: getTextWithNewlines(meaningTab.querySelector('.meaning-text')),
-            kanji: kanjiTab.querySelector('.kanji-info')?.textContent || ''
-        };
-    }
-
-    function checkDuplicate(text) {
-        return new Promise((resolve, reject) => {
-            chrome.runtime.sendMessage({
-                type: 'CHECK_DUPLICATE',
-                ankiConnectUrl: settings.ankiConnectUrl,
-                params: {
-                    query: `deck:"${settings.deckName}" ${settings.fieldMapping.word}:"${text}"`
-                }
-            }, response => {
-                if (response && response.success) {
-                    resolve(response.result); // findNotes 결과
-                } else {
-                    reject(response ? response.error : 'Anki 중복 검사 오류');
-                }
-            });
-        });
-    }
-
     function createAnkiNote(text, wordInfo) {
         const fields = {};
-        let meaning = wordInfo.meaning || '';
-        
+        let meaning = wordInfo.llmMeaning || '';
+        let reading = wordInfo.jisho.japanese[0].reading || '';
         if (!isKanaOnly(text)) {
-            meaning = (wordInfo.reading || '') + '\n\n' + meaning;
+            meaning = reading + '\n\n' + meaning;
         }
-        fields[settings.fieldMapping.word] = text + ' ';
+        fields[settings.fieldMapping.word] = text + ' [단어]';
         fields[settings.fieldMapping.meaning] = meaning.replace(/\n/g, '<br>');
 
         return {
@@ -501,7 +502,7 @@ function handleTextSelection(event) {
     function showSaveSuccess() {
         const saveBtn = popup.querySelector('.save-btn');
         const originalText = saveBtn.textContent;
-        saveBtn.textContent = '저장됨!';
+        saveBtn.textContent = '저장됨! [단어]';
         saveBtn.style.backgroundColor = '#4CAF50';
 
         setTimeout(() => {
@@ -513,12 +514,84 @@ function handleTextSelection(event) {
     function showSaveError(message) {
         const saveBtn = popup.querySelector('.save-btn');
         const originalText = saveBtn.textContent;
-        saveBtn.textContent = message || '저장 실패';
+        saveBtn.textContent = (message || '저장 실패') + ' [단어]';
         saveBtn.style.backgroundColor = '#f44336';
 
         setTimeout(() => {
             saveBtn.textContent = originalText;
             saveBtn.style.backgroundColor = '';
+        }, 2000);
+    }
+
+    async function saveKanjiToAnki(kanji, btnEl) {
+        try {
+            console.log('saveKanjiToAnki', kanji);
+            // 중복 체크 (한자 자체로, 정확히 일치하는 경우만)
+            const isDuplicate = await checkDuplicateExact(kanji.kanji);
+            if (isDuplicate) {
+                console.log('이미 저장됨');
+                return showKanjiSaveError(btnEl, '이미 저장됨');
+            }
+            // 카드 생성
+            const note = createKanjiAnkiNote(kanji);
+            const result = await addNoteToAnki(note);
+            if (result) {
+                showKanjiSaveSuccess(btnEl);
+            } else {
+                showKanjiSaveError(btnEl, '저장 실패');
+            }
+        } catch (error) {
+            showKanjiSaveError(btnEl, 'Anki 오류');
+        }
+    }
+    function createKanjiAnkiNote(kanji) {
+        const fields = {};
+        // Front: just the kanji + [한자]
+        fields[settings.fieldMapping.word] = (kanji.kanji || '').trim() + ' [한자]';
+
+        // Back: Korean meaning, 음독, 훈독, each with label and linebreaks
+        let back = '';
+        if (kanji.korean?.meaning || kanji.korean?.reading) {
+            back += (kanji.korean?.meaning || '') + (kanji.korean?.reading ? ' ' + kanji.korean.reading : '') + '\n';
+        }
+        // Add Japanese readings with labels
+        if (kanji.on_readings && kanji.on_readings.length > 0) {
+            back += '음독: ' + kanji.on_readings.join(', ') + '\n';
+        }
+        if (kanji.kun_readings && kanji.kun_readings.length > 0) {
+            back += '훈독: ' + kanji.kun_readings.join(', ') + '\n';
+        }
+        fields[settings.fieldMapping.meaning] = back.replace(/\n/g, '<br>');
+
+        if (settings.fieldMapping.reading) {
+            fields[settings.fieldMapping.reading] = (kanji.on_readings?.join(', ') || '') + '<br>' + (kanji.kun_readings?.join(', ') || '');
+        }
+        if (settings.fieldMapping.kanji) {
+            fields[settings.fieldMapping.kanji] = kanji.kanji || '';
+        }
+        return {
+            deckName: settings.deckName,
+            modelName: settings.noteType,
+            fields: fields,
+            tags: ['drag2anki', 'kanji']
+        };
+    }
+    function showKanjiSaveSuccess(btn) {
+        const originalText = btn.textContent;
+        btn.textContent = '저장됨! [한자]';
+        btn.style.backgroundColor = '#4CAF50';
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.style.backgroundColor = '';
+        }, 2000);
+    }
+    function showKanjiSaveError(btn, message) {
+        const originalText = btn.textContent;
+        btn.textContent = (message || '저장 실패') + ' [한자]';
+        btn.style.backgroundColor = '#f44336';
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.style.backgroundColor = '';
         }, 2000);
     }
 
