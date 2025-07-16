@@ -639,12 +639,14 @@ function getSelectedTextWithoutRuby() {
     const range = selection.getRangeAt(0);
     const container = range.cloneContents();
 
-    // 임시 div에 붙여서 <rt> 태그 제거
+    // 임시 div에 붙여서 <rt> 태그 및 후리가나 class 제거
     const tempDiv = document.createElement('div');
     tempDiv.appendChild(container);
 
     // 모든 <rt> 태그 제거
     tempDiv.querySelectorAll('rt').forEach(rt => rt.remove());
+    // furigana, pronunciation 등 후리가나 class를 가진 span 제거
+    tempDiv.querySelectorAll('.furigana, .pronunciation, .reading, .yomi').forEach(el => el.remove());
 
     // 텍스트만 추출
     return tempDiv.textContent.trim();
