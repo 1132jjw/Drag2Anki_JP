@@ -61,17 +61,19 @@ function handleTextSelection(event) {
     if (popup && popup.contains(event.target)) return;
 
     setTimeout(() => {
-        const selection = window.getSelection();
-        const selectedText = selection.toString().trim();
+        const selectedText = getSelectedTextWithoutRuby();
 
         if (selectedText && isJapaneseTextOnly(selectedText)) {
+            const normalizedText = removeJapaneseParens(selectedText);
+            const selection = window.getSelection();
             const range = selection.getRangeAt(0);
             const rect = range.getBoundingClientRect();
-            showPopup(selectedText, rect);
+            // 팝업에는 원본, 내부처리에는 정규화된 텍스트 전달
+            showPopup(selectedText, rect, normalizedText);
         } else {
             hidePopup();
         }
-    }, 20); // 10~30ms 정도면 충분
+    }, 20);
 }
 
 
@@ -93,25 +95,26 @@ function handleTextSelection(event) {
     }
 
     function isJapaneseTextOnly(text) {
-        const japaneseOnlyRegex = /^[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]+$/;
-        return japaneseOnlyRegex.test(text);
+        // 일본어 문자, 괄호, 괄호 안의 일본어 허용
+        const japaneseWithParensRegex = /^[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF\(\)]+$/;
+        return japaneseWithParensRegex.test(text);
     }
 
     function isKanaOnly(text) {
         const kanaRegex = /^[\u3040-\u309F\u30A0-\u30FF]+$/;
         return kanaRegex.test(text);}
 
-    function showPopup(text, rect) {
+    function showPopup(displayText, rect, normalizedText) {
         hidePopup();
 
-        popup = createPopup(text, rect);
+        popup = createPopup(displayText, rect);
         document.body.appendChild(popup);
         
         // 팝업 위치 조정
         adjustPopupPosition(popup, rect);
         
-        // 단어 정보 로드
-        loadWordInfo(text);
+        // 단어 정보 로드 시 normalizedText 사용
+        loadWordInfo(normalizedText);
     }
 
     function createPopup(text, rect) {
@@ -628,3 +631,27 @@ function handleTextSelection(event) {
     });
 
 })();
+
+function getSelectedTextWithoutRuby() {
+    const selection = window.getSelection();
+    if (selection.rangeCount === 0) return '';
+
+    const range = selection.getRangeAt(0);
+    const container = range.cloneContents();
+
+    // 임시 div에 붙여서 <rt> 태그 제거
+    const tempDiv = document.createElement('div');
+    tempDiv.appendChild(container);
+
+    // 모든 <rt> 태그 제거
+    tempDiv.querySelectorAll('rt').forEach(rt => rt.remove());
+
+    // 텍스트만 추출
+    return tempDiv.textContent.trim();
+}
+
+function removeJapaneseParens(text) {
+    // 예: 生(ま)れる → 生まれる
+    return text.replace(/[\(\)]/g, ''); // 괄호만 제거
+    // 또는, 괄호와 그 안의 문자까지 제거하려면: text.replace(/\([^\)]*\)/g, '')
+}
