@@ -278,6 +278,7 @@ function handleTextSelection(event) {
 
                             부사  
                    1                   아래의 형식을 꼭 지켜서, 입력받은 일본어 단어의 후리가나와 뜻을 알려주세요.
+
                     `,
                     },
                     {
@@ -300,6 +301,11 @@ function handleTextSelection(event) {
             reading: readingMatch ? readingMatch[1].trim() : '',
             meaning: meaningMatch ? meaningMatch[1].trim() : content
         };
+    }
+
+    async function loadHanjaDict() {
+        const response = await fetch(chrome.runtime.getURL('data/hanja.json'));
+        return await response.json();
     }
 
     async function loadHanjaDict() {
@@ -364,8 +370,11 @@ function handleTextSelection(event) {
         } else if (wordInfo.jisho) {
             // LLM에서 뜻을 받지 못한 경우 Jisho API 사용 (fallback)
             const meanings = wordInfo.jisho.senses[0].english_definitions;
-            meaningHtml = `<div class="meaning-text">${meanings.join(', ')}</div>`;
-        }
+            // 한국어 뜻이 있다면 한국어 뜻으로 표시
+            const meaningText = wordInfo.llmMeaning
+                ? wordInfo.llmMeaning
+                : meanings.join(', ');
+
 
         meaningTab.querySelector('.reading').innerHTML = readingHtml;
         meaningTab.querySelector('.meaning').innerHTML = meaningHtml;
