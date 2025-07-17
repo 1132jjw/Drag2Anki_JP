@@ -59,7 +59,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": [ "data/hanja.json" ],
+      "resources": [ "data/hanja.json", "data/jp_simp_to_kr_trad.json" ],
       "matches": ["<all_urls>"]
     }
   ]

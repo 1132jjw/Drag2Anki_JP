@@ -28,6 +28,39 @@
     const cache = new Map();
     const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24시간
 
+    // === 일본 신자체→한국 정자체 매핑 로딩 ===
+    let jpSimpToKrTradDict = null;
+    async function loadJpSimpToKrTradDict() {
+        if (jpSimpToKrTradDict) return jpSimpToKrTradDict;
+        const resp = await fetch(chrome.runtime.getURL('data/jp_simp_to_kr_trad.json'));
+        jpSimpToKrTradDict = await resp.json();
+        return jpSimpToKrTradDict;
+    }
+
+    // === 한자 사전 로딩 ===
+    let hanjaDict = null;
+    async function loadHanjaDict() {
+        if (hanjaDict) return hanjaDict;
+        const resp = await fetch(chrome.runtime.getURL('data/hanja.json'));
+        hanjaDict = await resp.json();
+        // 일본 신자체→한국 정자체 매핑도 미리 로딩
+        await loadJpSimpToKrTradDict();
+        return hanjaDict;
+    }
+
+    // === 한자 정보 조회 (일본 신자체→한국 정자체 변환 지원) ===
+    async function getHanjaInfo(char) {
+        await loadHanjaDict();
+        await loadJpSimpToKrTradDict();
+        console.log("char: ", char);
+        console.log("hanjaDict[char]: ", hanjaDict[char]);
+        if (hanjaDict[char]) return hanjaDict[char];
+        if (jpSimpToKrTradDict && jpSimpToKrTradDict[char] && hanjaDict[jpSimpToKrTradDict[char]]) {
+            return hanjaDict[jpSimpToKrTradDict[char]];
+        }
+        return null;
+    }
+
     // 초기화
     init();
 
@@ -303,21 +336,9 @@ function handleTextSelection(event) {
         };
     }
 
-    async function loadHanjaDict() {
-        const response = await fetch(chrome.runtime.getURL('data/hanja.json'));
-        return await response.json();
-    }
-
-    async function loadHanjaDict() {
-        const response = await fetch(chrome.runtime.getURL('data/hanja.json'));
-        return await response.json();
-    }
-
     async function fetchKanjiData(text) {
         const kanjiList = text.match(/[\u4E00-\u9FAF]/g) || [];
         const kanjiData = [];
-        const hanjaDict = await loadHanjaDict();
-
         for (const kanji of kanjiList) {
             let data = {};
             try {
@@ -327,7 +348,7 @@ function handleTextSelection(event) {
                 console.error(`한자 정보 로드 오류 (${kanji}):`, error);
             }
 
-            const koreanHanjaInfo = hanjaDict[kanji] || null;
+            const koreanHanjaInfo = await getHanjaInfo(kanji);
             data.korean = koreanHanjaInfo;
 
             kanjiData.push(data);
