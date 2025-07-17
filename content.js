@@ -213,7 +213,7 @@ function handleTextSelection(event) {
                 for (const kanji of wordInfo.kanji || []) {
                     if (!kanji.korean) {
                         kanji.korean = {
-                            meaning: wordInfo.llmMeaning.replace(/\n/g, '<br>') || '(이 한자는 한국에서 사용되지 않습니다.)',
+                            meaning: wordInfo.llmMeaning.meaning.replace(/\n/g, '<br>') || '(이 한자는 한국에서 사용되지 않습니다.)',
                             reading: '<br>[일본 한자]'
                         };
                     }
@@ -261,29 +261,23 @@ function handleTextSelection(event) {
                     {
                         role: 'system',
                         content: `
-                            당신은 일본어 단어를 한국어로 번역하는 사전 역할을 합니다.
+                            당신은 일본어 단어를 분석하는 사전 역할을 합니다.
 
-                            - 입력받은 일본어 단어의 품사(명사, 동사, 형용사, 부사 등)를 구분해서 출력하세요.
-                            - 각 품사별로 의미가 하나뿐이어도 반드시 '1.'과 같이 숫자를 붙여서 출력하세요.
-                            - 의미가 여러 개라면 1, 2, 3처럼 숫자를 붙여 줄바꿈하여 나열하세요.
-                            - 각 뜻은 되도록 사전적인 표현으로 간결하게 정리하세요.
+                            입력받은 일본어 단어에 대해 다음 형식으로 응답해주세요:
 
-                            아래는 출력 예시입니다.
+                            후리가나: 단어의 후리가나(히라가나/카타카나)]
+                            뜻: [한국어 번역]
 
                             예시)
                             input: 偶然
-
                             output:
+                            후리가나: ぐうぜん
+                            뜻:
                             명사  
-                            1. 우연.  
-                            2. (철학) ((contingency)) 우연성; 어떤 사물이 인과율(因果律)에 근거하지 않는 성질.
+                   1                 2(철학) ((contingency)) 우연성; 어떤 사물이 인과율(因果律)에 근거하지 않는 성질.
 
                             부사  
-                            1. 우연히.
-
-                            ===
-
-                            아래의 형식을 꼭 지켜서, 입력받은 일본어 단어의 뜻을 한국어로 알려주세요.
+                   1                   아래의 형식을 꼭 지켜서, 입력받은 일본어 단어의 후리가나와 뜻을 알려주세요.
                     `,
                     },
                     {
@@ -296,7 +290,16 @@ function handleTextSelection(event) {
         });
 
         const data = await response.json();
-        return data.choices[0].message.content;
+        const content = data.choices[0].message.content;
+        
+        // 후리가나와 뜻을 분리하여 객체로 반환
+        const readingMatch = content.match(/후리가나:\s*(.+)/);
+        const meaningMatch = content.match(/뜻:\s*([\s\S]*)/);
+        
+        return {
+            reading: readingMatch ? readingMatch[1].trim() : '',
+            meaning: meaningMatch ? meaningMatch[1].trim() : content
+        };
     }
 
     async function loadHanjaDict() {
@@ -347,19 +350,21 @@ function handleTextSelection(event) {
         let readingHtml = '<div class="reading-text">정보가 없습니다.</div>';
         let meaningHtml = '<div class="meaning-text">정보가 없습니다.</div>';
 
-        if (wordInfo.jisho) {
-            const reading = wordInfo.jisho.japanese[0];
-            if (reading.reading) {
-                readingHtml = `<div class="reading-text">${reading.reading}</div>`;
-            }
+        // LLM에서 받아온 후리가나와 뜻 사용
+        if (wordInfo.llmMeaning && wordInfo.llmMeaning.reading) {
+            readingHtml = `<div class="reading-text">${wordInfo.llmMeaning.reading}</div>`;
+        } else if (wordInfo.jisho && wordInfo.jisho.japanese[0].reading) {
+            // LLM에서 후리가나를 받지 못한 경우 Jisho API 사용 (fallback)
+            readingHtml = `<div class="reading-text">${wordInfo.jisho.japanese[0].reading}</div>`;
+        }
 
+        // LLM에서 받아온 뜻 사용
+        if (wordInfo.llmMeaning && wordInfo.llmMeaning.meaning) {
+            meaningHtml = `<div class="meaning-text">${wordInfo.llmMeaning.meaning.replace(/\n/g, '<br>')}</div>`;
+        } else if (wordInfo.jisho) {
+            // LLM에서 뜻을 받지 못한 경우 Jisho API 사용 (fallback)
             const meanings = wordInfo.jisho.senses[0].english_definitions;
-            // 한국어 뜻이 있다면 한국어 뜻으로 표시
-            const meaningText = wordInfo.llmMeaning
-                ? wordInfo.llmMeaning
-                : meanings.join(', ');
-
-            meaningHtml = `<div class="meaning-text">${meaningText.replace(/\n/g, '<br>')}</div>`;
+            meaningHtml = `<div class="meaning-text">${meanings.join(', ')}</div>`;
         }
 
         meaningTab.querySelector('.reading').innerHTML = readingHtml;
@@ -467,11 +472,26 @@ function handleTextSelection(event) {
 
     function createAnkiNote(text, wordInfo) {
         const fields = {};
-        let meaning = wordInfo.llmMeaning || '';
-        let reading = wordInfo.jisho.japanese[0].reading || '';
-        if (!isKanaOnly(text)) {
+        
+        // LLM에서 받아온 후리가나와 뜻 사용
+        let meaning = '';
+        let reading = '';
+        
+        if (wordInfo.llmMeaning && wordInfo.llmMeaning.meaning) {
+            meaning = wordInfo.llmMeaning.meaning;
+        }
+        
+        if (wordInfo.llmMeaning && wordInfo.llmMeaning.reading) {
+            reading = wordInfo.llmMeaning.reading;
+        } else if (wordInfo.jisho && wordInfo.jisho.japanese[0].reading) {
+            // LLM에서 후리가나를 받지 못한 경우 Jisho API 사용 (fallback)
+            reading = wordInfo.jisho.japanese[0].reading;
+        }
+        
+        if (!isKanaOnly(text) && reading) {
             meaning = reading + '\n\n' + meaning;
         }
+        
         fields[settings.fieldMapping.word] = text + ' [단어]';
         fields[settings.fieldMapping.meaning] = meaning.replace(/\n/g, '<br>');
 
