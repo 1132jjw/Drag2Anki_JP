@@ -241,16 +241,7 @@ function handleTextSelection(event) {
                     llmMeaning: safeValue(llmMeaning),
                     kanji: safeValue(kanjiData)
                 };
-                
-                // 한국 한자 정보가 없는 경우 llmmeaning을 한국 한자 정보로 사용
-                for (const kanji of wordInfo.kanji || []) {
-                    if (!kanji.korean) {
-                        kanji.korean = {
-                            meaning: wordInfo.llmMeaning.meaning.replace(/\n/g, '<br>') || '(이 한자는 한국에서 사용되지 않습니다.)',
-                            reading: '<br>[일본 한자]'
-                        };
-                    }
-                }
+
                 console.log('단어 정보:', wordInfo);
 
                 // 캐시 저장
@@ -349,7 +340,28 @@ function handleTextSelection(event) {
             }
 
             const koreanHanjaInfo = await getHanjaInfo(kanji);
-            data.korean = koreanHanjaInfo;
+            if (koreanHanjaInfo) {
+                data.korean = koreanHanjaInfo;
+            } else {
+                // 한자 1글자만 LLM에 넣어서 설명 받기
+                let llmMeaning = null;
+                try {
+                    llmMeaning = await fetchLLMMeaning(kanji);
+                } catch (e) {
+                    llmMeaning = null;
+                }
+                if (llmMeaning) {
+                    data.korean = {
+                        meaning: llmMeaning.meaning.replace(/\n/g, '<br>') || '(이 한자는 한국에서 사용되지 않습니다.)',
+                        reading: '<br>[일본 한자]'
+                    };
+                } else {
+                    data.korean = {
+                        meaning: '(이 한자는 한국에서 사용되지 않습니다.)',
+                        reading: '<br>[일본 한자]'
+                    };
+                }
+            }
 
             kanjiData.push(data);
         }
