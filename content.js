@@ -22,6 +22,8 @@
         shortcut: 'Ctrl+Shift+D'
     };
 
+    let currentWordInfo = null; // 전역 선언
+
     // 캐시 시스템
     const cache = new Map();
     const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24시간
@@ -59,17 +61,19 @@ function handleTextSelection(event) {
     if (popup && popup.contains(event.target)) return;
 
     setTimeout(() => {
-        const selection = window.getSelection();
-        const selectedText = selection.toString().trim();
+        const selectedText = getSelectedTextWithoutRuby();
 
-        if (selectedText && isJapaneseText(selectedText)) {
+        if (selectedText && isJapaneseTextOnly(selectedText)) {
+            const normalizedText = removeJapaneseParens(selectedText);
+            const selection = window.getSelection();
             const range = selection.getRangeAt(0);
             const rect = range.getBoundingClientRect();
-            showPopup(selectedText, rect);
+            // 팝업에는 원본, 내부처리에는 정규화된 텍스트 전달
+            showPopup(selectedText, rect, normalizedText);
         } else {
             hidePopup();
         }
-    }, 20); // 10~30ms 정도면 충분
+    }, 20);
 }
 
 
@@ -90,26 +94,27 @@ function handleTextSelection(event) {
         }
     }
 
-    function isJapaneseText(text) {
-        const japaneseRegex = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/;
-        return japaneseRegex.test(text);
+    function isJapaneseTextOnly(text) {
+        // 일본어 문자, 괄호, 괄호 안의 일본어 허용
+        const japaneseWithParensRegex = /^[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF\(\)]+$/;
+        return japaneseWithParensRegex.test(text);
     }
 
     function isKanaOnly(text) {
         const kanaRegex = /^[\u3040-\u309F\u30A0-\u30FF]+$/;
         return kanaRegex.test(text);}
 
-    function showPopup(text, rect) {
+    function showPopup(displayText, rect, normalizedText) {
         hidePopup();
 
-        popup = createPopup(text, rect);
+        popup = createPopup(displayText, rect);
         document.body.appendChild(popup);
-
+        
         // 팝업 위치 조정
         adjustPopupPosition(popup, rect);
-
-        // 단어 정보 로드
-        loadWordInfo(text);
+        
+        // 단어 정보 로드 시 normalizedText 사용
+        loadWordInfo(normalizedText);
     }
 
     function createPopup(text, rect) {
@@ -139,7 +144,7 @@ function handleTextSelection(event) {
                 </div>
             </div>
             <div class="popup-footer">
-                <button class="save-btn">Anki에 저장</button>
+                <button class="save-btn">Anki에 저장 [단어]</button>
             </div>
         `;
 
@@ -203,6 +208,16 @@ function handleTextSelection(event) {
                     llmMeaning: safeValue(llmMeaning),
                     kanji: safeValue(kanjiData)
                 };
+                
+                // 한국 한자 정보가 없는 경우 llmmeaning을 한국 한자 정보로 사용
+                for (const kanji of wordInfo.kanji || []) {
+                    if (!kanji.korean) {
+                        kanji.korean = {
+                            meaning: wordInfo.llmMeaning.meaning.replace(/\n/g, '<br>') || '(이 한자는 한국에서 사용되지 않습니다.)',
+                            reading: '<br>[일본 한자]'
+                        };
+                    }
+                }
                 console.log('단어 정보:', wordInfo);
 
                 // 캐시 저장
@@ -214,6 +229,7 @@ function handleTextSelection(event) {
                 }
             }
 
+            currentWordInfo = wordInfo; // wordInfo 저장
             displayWordInfo(wordInfo);
 
         } catch (error) {
@@ -245,29 +261,24 @@ function handleTextSelection(event) {
                     {
                         role: 'system',
                         content: `
-                            당신은 일본어 단어를 한국어로 번역하는 사전 역할을 합니다.
+                            당신은 일본어 단어를 분석하는 사전 역할을 합니다.
 
-                            - 입력받은 일본어 단어의 품사(명사, 동사, 형용사, 부사 등)를 구분해서 출력하세요.
-                            - 각 품사별로 의미가 하나뿐이어도 반드시 '1.'과 같이 숫자를 붙여서 출력하세요.
-                            - 의미가 여러 개라면 1, 2, 3처럼 숫자를 붙여 줄바꿈하여 나열하세요.
-                            - 각 뜻은 되도록 사전적인 표현으로 간결하게 정리하세요.
+                            입력받은 일본어 단어에 대해 다음 형식으로 응답해주세요:
 
-                            아래는 출력 예시입니다.
+                            후리가나: 단어의 후리가나(히라가나/카타카나)]
+                            뜻: [한국어 번역]
 
                             예시)
                             input: 偶然
-
                             output:
+                            후리가나: ぐうぜん
+                            뜻:
                             명사  
-                            1. 우연.  
-                            2. (철학) ((contingency)) 우연성; 어떤 사물이 인과율(因果律)에 근거하지 않는 성질.
+                   1                 2(철학) ((contingency)) 우연성; 어떤 사물이 인과율(因果律)에 근거하지 않는 성질.
 
                             부사  
-                            1. 우연히.
+                   1                   아래의 형식을 꼭 지켜서, 입력받은 일본어 단어의 후리가나와 뜻을 알려주세요.
 
-                            ===
-
-                            아래의 형식을 꼭 지켜서, 입력받은 일본어 단어의 뜻을 한국어로 알려주세요.
                     `,
                     },
                     {
@@ -280,7 +291,21 @@ function handleTextSelection(event) {
         });
 
         const data = await response.json();
-        return data.choices[0].message.content;
+        const content = data.choices[0].message.content;
+        
+        // 후리가나와 뜻을 분리하여 객체로 반환
+        const readingMatch = content.match(/후리가나:\s*(.+)/);
+        const meaningMatch = content.match(/뜻:\s*([\s\S]*)/);
+        
+        return {
+            reading: readingMatch ? readingMatch[1].trim() : '',
+            meaning: meaningMatch ? meaningMatch[1].trim() : content
+        };
+    }
+
+    async function loadHanjaDict() {
+        const response = await fetch(chrome.runtime.getURL('data/hanja.json'));
+        return await response.json();
     }
 
     async function loadHanjaDict() {
@@ -303,9 +328,8 @@ function handleTextSelection(event) {
             }
 
             const koreanHanjaInfo = hanjaDict[kanji] || null;
-            data.korean = koreanHanjaInfo
+            data.korean = koreanHanjaInfo;
 
-            console.log(`한자 정보 (${kanji}):`, data);
             kanjiData.push(data);
         }
 
@@ -332,20 +356,25 @@ function handleTextSelection(event) {
         let readingHtml = '<div class="reading-text">정보가 없습니다.</div>';
         let meaningHtml = '<div class="meaning-text">정보가 없습니다.</div>';
 
-        if (wordInfo.jisho) {
-            const reading = wordInfo.jisho.japanese[0];
-            if (reading.reading) {
-                readingHtml = `<div class="reading-text">${reading.reading}</div>`;
-            }
+        // LLM에서 받아온 후리가나와 뜻 사용
+        if (wordInfo.llmMeaning && wordInfo.llmMeaning.reading) {
+            readingHtml = `<div class="reading-text">${wordInfo.llmMeaning.reading}</div>`;
+        } else if (wordInfo.jisho && wordInfo.jisho.japanese[0].reading) {
+            // LLM에서 후리가나를 받지 못한 경우 Jisho API 사용 (fallback)
+            readingHtml = `<div class="reading-text">${wordInfo.jisho.japanese[0].reading}</div>`;
+        }
 
+        // LLM에서 받아온 뜻 사용
+        if (wordInfo.llmMeaning && wordInfo.llmMeaning.meaning) {
+            meaningHtml = `<div class="meaning-text">${wordInfo.llmMeaning.meaning.replace(/\n/g, '<br>')}</div>`;
+        } else if (wordInfo.jisho) {
+            // LLM에서 뜻을 받지 못한 경우 Jisho API 사용 (fallback)
             const meanings = wordInfo.jisho.senses[0].english_definitions;
             // 한국어 뜻이 있다면 한국어 뜻으로 표시
             const meaningText = wordInfo.llmMeaning
                 ? wordInfo.llmMeaning
                 : meanings.join(', ');
 
-            meaningHtml = `<div class="meaning-text">${meaningText.replace(/\n/g, '<br>')}</div>`;
-        }
 
         meaningTab.querySelector('.reading').innerHTML = readingHtml;
         meaningTab.querySelector('.meaning').innerHTML = meaningHtml;
@@ -353,17 +382,18 @@ function handleTextSelection(event) {
         // 한자 탭 내용
         let kanjiHtml = '';
         if (wordInfo.kanji && wordInfo.kanji.length > 0) {
-            wordInfo.kanji.forEach(kanji => {
+            wordInfo.kanji.forEach((kanji, idx) => {
                 kanjiHtml += `
-                    <div class="kanji-item">
+                    <div class="kanji-item" data-kanji-idx="${idx}">
                         <div class="kanji-char">${kanji.kanji}</div>
                         <div class="kanji-details">
-                            <div class="kanji-meanings">${kanji.korean.meaning} ${kanji.korean.reading}</div>
+                            <div class="kanji-meanings">${kanji.korean?.meaning || ''} ${kanji.korean?.reading || ''}</div>
                             <div class="kanji-readings">
-                                <span>음독: ${kanji.on_readings.join(', ')}</span>
-                                <span>훈독: ${kanji.kun_readings.join(', ')}</span>
-                                <span>JLPT: ${kanji.jlpt}</span>
+                                <span>음독: ${(kanji.on_readings||[]).join(', ')}</span>
+                                <span>훈독: ${(kanji.kun_readings||[]).join(', ')}</span>
+                                <span>JLPT: ${kanji.jlpt || ''}</span>
                             </div>
+                            <button class="kanji-save-btn" data-kanji-idx="${idx}">Anki에 저장 [한자]</button>
                         </div>
                     </div>
                 `;
@@ -373,6 +403,20 @@ function handleTextSelection(event) {
         }
 
         document.querySelector('#kanji-tab .kanji-info').innerHTML = kanjiHtml;
+        // 한자 저장 버튼 이벤트 위임 (뜻 탭용) 제거
+        // 한자 탭용 기존 이벤트 위임 유지
+        const kanjiInfoEl = document.querySelector('#kanji-tab .kanji-info');
+        if (kanjiInfoEl) {
+            kanjiInfoEl.addEventListener('click', async function(e) {
+                const btn = e.target.closest('.kanji-save-btn');
+                if (btn) {
+                    const idx = btn.getAttribute('data-kanji-idx');
+                    if (wordInfo.kanji && wordInfo.kanji[idx]) {
+                        await saveKanjiToAnki(wordInfo.kanji[idx], btn);
+                    }
+                }
+            });
+        }
     }
 
     function displayError(message) {
@@ -389,13 +433,33 @@ function handleTextSelection(event) {
         popup.querySelector(`#${tabName}-tab`).classList.add('active');
     }
 
+    // 정확히 일치하는 중복만 검사하는 함수 (background.js에 위임)
+    async function checkDuplicateExact(text) {
+        return new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage({
+                type: 'CHECK_DUPLICATE_EXACT',
+                ankiConnectUrl: settings.ankiConnectUrl,
+                params: { query: `"${text.trim()}"` },
+                fieldName: settings.fieldMapping.word,
+                text: text.trim()
+            }, response => {
+                if (response && response.success) {
+                    resolve(response.isDuplicate);
+                } else {
+                    reject(response ? response.error : 'Anki 중복 검사 오류');
+                }
+            });
+        });
+    }
+
     async function saveToAnki(text) {
         try {
-            const wordInfo = getCurrentWordInfo();
+            const wordInfo = currentWordInfo; // wordInfo 직접 사용
+            console.log('저장할 단어 정보:', wordInfo);
 
-            // 중복 체크
-            const duplicateCheck = await checkDuplicate(text);
-            if (duplicateCheck.length > 0) {
+            // 중복 체크 (정확히 일치하는 경우만)
+            const isDuplicate = await checkDuplicateExact(text);
+            if (isDuplicate) {
                 return showSaveError('이미 Anki에 저장된 단어입니다.');
             }
 
@@ -415,46 +479,30 @@ function handleTextSelection(event) {
         }
     }
 
-    function getCurrentWordInfo() {
-        const meaningTab = popup.querySelector('#meaning-tab');
-        const kanjiTab = popup.querySelector('#kanji-tab');
-
-        return {
-            reading: meaningTab.querySelector('.reading-text')?.textContent || '',
-            meaning: meaningTab.querySelector('.meaning-text')?.textContent || '',
-            koreanMeaning: meaningTab.querySelector('.korean-meaning')?.textContent || '',
-            kanji: kanjiTab.querySelector('.kanji-info')?.textContent || ''
-        };
-    }
-
-    function checkDuplicate(text) {
-        return new Promise((resolve, reject) => {
-            chrome.runtime.sendMessage({
-                type: 'CHECK_DUPLICATE',
-                ankiConnectUrl: settings.ankiConnectUrl,
-                params: {
-                    query: `deck:"${settings.deckName}" ${settings.fieldMapping.word}:"${text}"`
-                }
-            }, response => {
-                if (response && response.success) {
-                    resolve(response.result); // findNotes 결과
-                } else {
-                    reject(response ? response.error : 'Anki 중복 검사 오류');
-                }
-            });
-        });
-    }
-
     function createAnkiNote(text, wordInfo) {
         const fields = {};
-        let meaning = wordInfo.meaning || '';
         
-        if (!isKanaOnly(text)) {
-            meaning = (wordInfo.reading || '') + '\n\n' + meaning;
+        // LLM에서 받아온 후리가나와 뜻 사용
+        let meaning = '';
+        let reading = '';
+        
+        if (wordInfo.llmMeaning && wordInfo.llmMeaning.meaning) {
+            meaning = wordInfo.llmMeaning.meaning;
         }
-        fields[settings.fieldMapping.word] = text;
-        fields[settings.fieldMapping.reading] = wordInfo.reading;
-        fields[settings.fieldMapping.kanji] = wordInfo.kanji;
+        
+        if (wordInfo.llmMeaning && wordInfo.llmMeaning.reading) {
+            reading = wordInfo.llmMeaning.reading;
+        } else if (wordInfo.jisho && wordInfo.jisho.japanese[0].reading) {
+            // LLM에서 후리가나를 받지 못한 경우 Jisho API 사용 (fallback)
+            reading = wordInfo.jisho.japanese[0].reading;
+        }
+        
+        if (!isKanaOnly(text) && reading) {
+            meaning = reading + '\n\n' + meaning;
+        }
+        
+        fields[settings.fieldMapping.word] = text + ' [단어]';
+        fields[settings.fieldMapping.meaning] = meaning.replace(/\n/g, '<br>');
 
         return {
             deckName: settings.deckName,
@@ -486,7 +534,7 @@ function handleTextSelection(event) {
     function showSaveSuccess() {
         const saveBtn = popup.querySelector('.save-btn');
         const originalText = saveBtn.textContent;
-        saveBtn.textContent = '저장됨!';
+        saveBtn.textContent = '저장됨! [단어]';
         saveBtn.style.backgroundColor = '#4CAF50';
 
         setTimeout(() => {
@@ -498,12 +546,84 @@ function handleTextSelection(event) {
     function showSaveError(message) {
         const saveBtn = popup.querySelector('.save-btn');
         const originalText = saveBtn.textContent;
-        saveBtn.textContent = message || '저장 실패';
+        saveBtn.textContent = (message || '저장 실패') + ' [단어]';
         saveBtn.style.backgroundColor = '#f44336';
 
         setTimeout(() => {
             saveBtn.textContent = originalText;
             saveBtn.style.backgroundColor = '';
+        }, 2000);
+    }
+
+    async function saveKanjiToAnki(kanji, btnEl) {
+        try {
+            console.log('saveKanjiToAnki', kanji);
+            // 중복 체크 (한자 자체로, 정확히 일치하는 경우만)
+            const isDuplicate = await checkDuplicateExact(kanji.kanji);
+            if (isDuplicate) {
+                console.log('이미 저장됨');
+                return showKanjiSaveError(btnEl, '이미 저장됨');
+            }
+            // 카드 생성
+            const note = createKanjiAnkiNote(kanji);
+            const result = await addNoteToAnki(note);
+            if (result) {
+                showKanjiSaveSuccess(btnEl);
+            } else {
+                showKanjiSaveError(btnEl, '저장 실패');
+            }
+        } catch (error) {
+            showKanjiSaveError(btnEl, 'Anki 오류');
+        }
+    }
+    function createKanjiAnkiNote(kanji) {
+        const fields = {};
+        // Front: just the kanji + [한자]
+        fields[settings.fieldMapping.word] = (kanji.kanji || '').trim() + ' [한자]';
+
+        // Back: Korean meaning, 음독, 훈독, each with label and linebreaks
+        let back = '';
+        if (kanji.korean?.meaning || kanji.korean?.reading) {
+            back += (kanji.korean?.meaning || '') + (kanji.korean?.reading ? ' ' + kanji.korean.reading : '') + '\n';
+        }
+        // Add Japanese readings with labels
+        if (kanji.on_readings && kanji.on_readings.length > 0) {
+            back += '음독: ' + kanji.on_readings.join(', ') + '\n';
+        }
+        if (kanji.kun_readings && kanji.kun_readings.length > 0) {
+            back += '훈독: ' + kanji.kun_readings.join(', ') + '\n';
+        }
+        fields[settings.fieldMapping.meaning] = back.replace(/\n/g, '<br>');
+
+        if (settings.fieldMapping.reading) {
+            fields[settings.fieldMapping.reading] = (kanji.on_readings?.join(', ') || '') + '<br>' + (kanji.kun_readings?.join(', ') || '');
+        }
+        if (settings.fieldMapping.kanji) {
+            fields[settings.fieldMapping.kanji] = kanji.kanji || '';
+        }
+        return {
+            deckName: settings.deckName,
+            modelName: settings.noteType,
+            fields: fields,
+            tags: ['drag2anki', 'kanji']
+        };
+    }
+    function showKanjiSaveSuccess(btn) {
+        const originalText = btn.textContent;
+        btn.textContent = '저장됨! [한자]';
+        btn.style.backgroundColor = '#4CAF50';
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.style.backgroundColor = '';
+        }, 2000);
+    }
+    function showKanjiSaveError(btn, message) {
+        const originalText = btn.textContent;
+        btn.textContent = (message || '저장 실패') + ' [한자]';
+        btn.style.backgroundColor = '#f44336';
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.style.backgroundColor = '';
         }, 2000);
     }
 
@@ -540,3 +660,31 @@ function handleTextSelection(event) {
     });
 
 })();
+
+function getSelectedTextWithoutRuby() {
+    const selection = window.getSelection();
+    if (selection.rangeCount === 0) return '';
+
+    const range = selection.getRangeAt(0);
+    const container = range.cloneContents();
+
+    // 임시 div에 붙여서 <rt>, <rp> 태그 및 후리가나 class 제거
+    const tempDiv = document.createElement('div');
+    tempDiv.appendChild(container);
+
+    // 모든 <rt> 태그 제거 (후리가나 텍스트)
+    tempDiv.querySelectorAll('rt').forEach(rt => rt.remove());
+    // 모든 <rp> 태그 제거 (후리가나 괄호)
+    tempDiv.querySelectorAll('rp').forEach(rp => rp.remove());
+    // furigana, pronunciation 등 후리가나 class를 가진 span 제거
+    tempDiv.querySelectorAll('.furigana, .pronunciation, .reading, .yomi').forEach(el => el.remove());
+
+    // 텍스트만 추출
+    return tempDiv.textContent.trim();
+}
+
+function removeJapaneseParens(text) {
+    // 예: 生(ま)れる → 生まれる
+    return text.replace(/[\(\)]/g, ''); // 괄호만 제거
+    // 또는, 괄호와 그 안의 문자까지 제거하려면: text.replace(/\([^\)]*\)/g, '')
+}
