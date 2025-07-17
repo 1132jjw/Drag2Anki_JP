@@ -356,7 +356,7 @@ function handleTextSelection(event) {
         let readingHtml = '<div class="reading-text">정보가 없습니다.</div>';
         let meaningHtml = '<div class="meaning-text">정보가 없습니다.</div>';
 
-        // LLM에서 받아온 후리가나와 뜻 사용
+        // LLM에서 받아온 후리가나 사용
         if (wordInfo.llmMeaning && wordInfo.llmMeaning.reading) {
             readingHtml = `<div class="reading-text">${wordInfo.llmMeaning.reading}</div>`;
         } else if (wordInfo.jisho && wordInfo.jisho.japanese[0].reading) {
@@ -370,11 +370,7 @@ function handleTextSelection(event) {
         } else if (wordInfo.jisho) {
             // LLM에서 뜻을 받지 못한 경우 Jisho API 사용 (fallback)
             const meanings = wordInfo.jisho.senses[0].english_definitions;
-            // 한국어 뜻이 있다면 한국어 뜻으로 표시
-            const meaningText = wordInfo.llmMeaning
-                ? wordInfo.llmMeaning
-                : meanings.join(', ');
-
+        }
 
         meaningTab.querySelector('.reading').innerHTML = readingHtml;
         meaningTab.querySelector('.meaning').innerHTML = meaningHtml;
@@ -658,33 +654,32 @@ function handleTextSelection(event) {
             settings = { ...settings, ...changes.drag2anki_settings.newValue };
         }
     });
-
+    
+    function getSelectedTextWithoutRuby() {
+        const selection = window.getSelection();
+        if (selection.rangeCount === 0) return '';
+        
+        const range = selection.getRangeAt(0);
+        const container = range.cloneContents();
+        
+        // 임시 div에 붙여서 <rt>, <rp> 태그 및 후리가나 class 제거
+        const tempDiv = document.createElement('div');
+        tempDiv.appendChild(container);
+        
+        // 모든 <rt> 태그 제거 (후리가나 텍스트)
+        tempDiv.querySelectorAll('rt').forEach(rt => rt.remove());
+        // 모든 <rp> 태그 제거 (후리가나 괄호)
+        tempDiv.querySelectorAll('rp').forEach(rp => rp.remove());
+        // furigana, pronunciation 등 후리가나 class를 가진 span 제거
+        tempDiv.querySelectorAll('.furigana, .pronunciation, .reading, .yomi').forEach(el => el.remove());
+        
+        // 텍스트만 추출
+        return tempDiv.textContent.trim();
+    }
+    
+    function removeJapaneseParens(text) {
+        // 예: 生(ま)れる → 生まれる
+        return text.replace(/[\(\)]/g, ''); // 괄호만 제거
+        // 또는, 괄호와 그 안의 문자까지 제거하려면: text.replace(/\([^\)]*\)/g, '')
+    }
 })();
-
-function getSelectedTextWithoutRuby() {
-    const selection = window.getSelection();
-    if (selection.rangeCount === 0) return '';
-
-    const range = selection.getRangeAt(0);
-    const container = range.cloneContents();
-
-    // 임시 div에 붙여서 <rt>, <rp> 태그 및 후리가나 class 제거
-    const tempDiv = document.createElement('div');
-    tempDiv.appendChild(container);
-
-    // 모든 <rt> 태그 제거 (후리가나 텍스트)
-    tempDiv.querySelectorAll('rt').forEach(rt => rt.remove());
-    // 모든 <rp> 태그 제거 (후리가나 괄호)
-    tempDiv.querySelectorAll('rp').forEach(rp => rp.remove());
-    // furigana, pronunciation 등 후리가나 class를 가진 span 제거
-    tempDiv.querySelectorAll('.furigana, .pronunciation, .reading, .yomi').forEach(el => el.remove());
-
-    // 텍스트만 추출
-    return tempDiv.textContent.trim();
-}
-
-function removeJapaneseParens(text) {
-    // 예: 生(ま)れる → 生まれる
-    return text.replace(/[\(\)]/g, ''); // 괄호만 제거
-    // 또는, 괄호와 그 안의 문자까지 제거하려면: text.replace(/\([^\)]*\)/g, '')
-}
