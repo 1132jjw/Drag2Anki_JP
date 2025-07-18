@@ -52,8 +52,7 @@
     async function getHanjaInfo(char) {
         await loadHanjaDict();
         await loadJpSimpToKrTradDict();
-        console.log("char: ", char);
-        console.log("hanjaDict[char]: ", hanjaDict[char]);
+        
         if (hanjaDict[char]) return hanjaDict[char];
         if (jpSimpToKrTradDict && jpSimpToKrTradDict[char] && hanjaDict[jpSimpToKrTradDict[char]]) {
             return hanjaDict[jpSimpToKrTradDict[char]];
@@ -285,25 +284,33 @@ function handleTextSelection(event) {
                     {
                         role: 'system',
                         content: `
-                            당신은 일본어 단어를 분석하는 사전 역할을 합니다.
+                        [응답 형식]
 
-                            입력받은 일본어 단어에 대해 다음 형식으로 응답해주세요:
+                        후리가나: [단어의 후리가나]
+                        뜻:
+                        [품사]
+                            1.	[의미1]
+                            2.	[의미2]
+                        …
 
-                            후리가나: 단어의 후리가나(히라가나/카타카나)]
-                            뜻: [한국어 번역]
+                        ⸻
 
-                            예시)
-                            input: 偶然
-                            output:
-                            후리가나: ぐうぜん
-                            뜻:
-                            명사  
-                   1                 2(철학) ((contingency)) 우연성; 어떤 사물이 인과율(因果律)에 근거하지 않는 성질.
+                        예시
+                        입력: 偶然
+                        출력:
+                        후리가나: ぐうぜん
+                        뜻:
+                        명사
+                            1.	우연
+                            2.	(철학) ((contingency)) 우연성; 어떤 사물이 인과율에 근거하지 않는 성질
 
-                            부사  
-                   1                   아래의 형식을 꼭 지켜서, 입력받은 일본어 단어의 후리가나와 뜻을 알려주세요.
+                        부사
+                            1.	뜻하지 않게; 우연히
 
-                    `,
+                        ⸻
+
+                        입력받은 일본어 단어마다 위 형식에 맞춰 답변해 주세요.
+                        `,
                     },
                     {
                         role: 'user',
