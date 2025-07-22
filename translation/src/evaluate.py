@@ -26,3 +26,11 @@ class TER_Score:
     def compute(self, references, hypothesis):
         ter = sacrebleu.corpus_ter(hypothesis, references)
         return ter
+
+
+class BLEURT_Score:
+    def __init__(self):
+        pass
+    
+    def compute(self):
+        pass
