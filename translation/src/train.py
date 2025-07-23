@@ -10,6 +10,7 @@ def train():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, tokenizer = get_model_and_tokenizer()
 
+    download_data()
     train_dataloader, valid_dataloader = get_dataloaders(tokenizer)
 
     optimizer = optim.AdamW(model.parameters(), lr=config.LEARNING_RATE)

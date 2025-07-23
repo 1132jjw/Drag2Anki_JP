@@ -1,6 +1,6 @@
 MODEL_NAME = "facebook/nllb-200-distilled-1.3B"
-TRAIN_DATASET_PATH = "/home/jeujeon/1132jjw/Drag2Anki_JP/translation/data/train.csv"
-VALID_DATASET_PATH = "/home/jeujeon/1132jjw/Drag2Anki_JP/translation/data/valid.csv"
+TRAIN_DATASET_PATH = "data/train.csv"
+VALID_DATASET_PATH = "data/valid.csv"
 LEARNING_RATE = 2e-5
 EPOCHS = 3
 BATCH_SIZE = 16

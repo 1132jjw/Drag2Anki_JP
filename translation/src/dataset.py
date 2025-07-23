@@ -3,6 +3,20 @@ from torch.utils.data import Dataset
 import pandas as pd
 from transformers import AutoTokenizer
 from . import config
+from datasets import load_dataset
+import os
+
+def download_data():
+    data_dir = "data"
+    os.makedirs(data_dir, exist_ok=True)
+    if not os.path.exists(os.path.join(data_dir, "train.csv")):
+        print("Downloading dataset...")
+        ds = load_dataset("traintogpb/aihub-koja-translation-integrated-large-4.3m")
+        train = ds["train"].to_pandas()
+        valid = ds["validation"].to_pandas()
+        train.to_csv(os.path.join(data_dir, "train.csv"), index=False)
+        valid.to_csv(os.path.join(data_dir, "valid.csv"), index=False)
+        print("Dataset downloaded.")
 
 
 class TranslationDataset(Dataset):
