@@ -16,6 +16,8 @@ def download_data():
         valid = ds["validation"].to_pandas()
         train.to_csv(os.path.join(data_dir, "train.csv"), index=False)
         valid.to_csv(os.path.join(data_dir, "valid.csv"), index=False)
+        test = ds["test"].to_pandas()
+        test.to_csv(os.path.join(data_dir, "test.csv"), index=False)
         print("Dataset downloaded.")
 
 
