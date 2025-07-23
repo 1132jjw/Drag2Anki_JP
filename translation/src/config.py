@@ -1,0 +1,12 @@
+MODEL_NAME = "facebook/nllb-200-distilled-1.3B"
+TRAIN_DATASET_PATH = "/home/jeujeon/1132jjw/Drag2Anki_JP/translation/data/train.csv"
+VALID_DATASET_PATH = "/home/jeujeon/1132jjw/Drag2Anki_JP/translation/data/valid.csv"
+LEARNING_RATE = 2e-5
+EPOCHS = 3
+BATCH_SIZE = 16
+MAX_LENGTH = 128
+SRC_LANG = "jpn_Jpan"
+TGT_LANG = "kor_Hang"
+LORA_R = 16
+LORA_ALPHA = 32
+LORA_DROPOUT = 0.05
