@@ -1,2 +1,4 @@
 data/
 .env
+*epoch-*
+src/__pycache__
