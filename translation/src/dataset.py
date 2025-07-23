@@ -58,8 +58,8 @@ class TranslationDataset(Dataset):
 
 
 def get_dataloaders(tokenizer):
-    train_dataset = TranslationDataset(config.TRAIN_DATASET_PATH, tokenizer, nrows=100000)
-    valid_dataset = TranslationDataset(config.VALID_DATASET_PATH, tokenizer, nrows=1000)
+    train_dataset = TranslationDataset(config.TRAIN_DATASET_PATH, tokenizer)#, nrows=100000)
+    valid_dataset = TranslationDataset(config.VALID_DATASET_PATH, tokenizer)#, nrows=1000)
 
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset, batch_size=config.BATCH_SIZE, shuffle=True

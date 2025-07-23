@@ -5,9 +5,12 @@ import pandas as pd
 from tqdm import tqdm
 from . import config
 from .dataset import download_data
+from accelerate import Accelerator
+
 
 def evaluate_model(model_path):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    accelerator = Accelerator(mixed_precision="bf16") # Use bfloat16 for TPU
+    device = accelerator.device
 
     # Ensure test data is available
     download_data()
@@ -15,7 +18,9 @@ def evaluate_model(model_path):
     # Load the fine-tuned model and tokenizer
     model = AutoModelForSeq2SeqLM.from_pretrained(model_path)
     tokenizer = AutoTokenizer.from_pretrained(model_path)
-    model.to(device)
+
+    # Prepare model for accelerator
+    model = accelerator.prepare(model)
     model.eval()
 
     # Load test data

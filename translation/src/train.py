@@ -6,10 +6,13 @@ from .model import get_model_and_tokenizer
 from .dataset import get_dataloaders, download_data
 import os
 from datetime import datetime
+from accelerate import Accelerator
 
 
 def train():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    accelerator = Accelerator(mixed_precision="bf16") # Use bfloat16 for TPU
+    device = accelerator.device
+
     model, tokenizer = get_model_and_tokenizer()
 
     download_data()
@@ -17,9 +20,14 @@ def train():
 
     optimizer = optim.AdamW(model.parameters(), lr=config.LEARNING_RATE)
 
+    # Prepare everything for accelerator
+    model, optimizer, train_dataloader, valid_dataloader = accelerator.prepare(
+        model, optimizer, train_dataloader, valid_dataloader
+    )
+
     # Create a unique save directory for this training run
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    run_save_dir = f"nllb-finetuned-{timestamp}"
+    run_save_dir = f"nllb-finetuned"#-{timestamp}"
     os.makedirs(run_save_dir, exist_ok=True)
 
     for epoch in range(config.EPOCHS):
@@ -35,7 +43,7 @@ def train():
                 input_ids=input_ids, attention_mask=attention_mask, labels=labels
             )
             loss = outputs.loss
-            loss.backward()
+            accelerator.backward(loss)
             optimizer.step()
 
             total_loss += loss.item()
@@ -63,5 +71,6 @@ def train():
 
         # Save model checkpoint for each epoch within the unique run directory
         epoch_save_path = os.path.join(run_save_dir, f"epoch-{epoch+1}")
-        model.save_pretrained(epoch_save_path)
-        tokenizer.save_pretrained(epoch_save_path)
+        accelerator.save_state(epoch_save_path)
+
+    print(f"Training completed. Models saved in: {run_save_dir}")

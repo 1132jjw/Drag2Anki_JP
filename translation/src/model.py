@@ -65,16 +65,13 @@ class DeepL:
 
 
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 from peft import get_peft_model, LoraConfig, TaskType
 from . import config
 
 def get_model_and_tokenizer():
-    quantization_config = BitsAndBytesConfig(load_in_4bit=True)
     model = AutoModelForSeq2SeqLM.from_pretrained(
         config.MODEL_NAME,
-        quantization_config=quantization_config,
-        device_map="auto",
     )
     tokenizer = AutoTokenizer.from_pretrained(
         config.MODEL_NAME, src_lang=config.SRC_LANG, tgt_lang=config.TGT_LANG
