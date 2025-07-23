@@ -3,6 +3,8 @@ import openai
 import requests
 import os
 from dotenv import load_dotenv
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from . import config
 
 load_dotenv()
 
@@ -60,6 +62,37 @@ class DeepL:
         except Exception as e:
             print(f"DeepL API 요청 실패: {e}")
             return None
+
+
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, BitsAndBytesConfig
+from peft import get_peft_model, LoraConfig, TaskType
+from . import config
+
+def get_model_and_tokenizer():
+    quantization_config = BitsAndBytesConfig(load_in_4bit=True)
+    model = AutoModelForSeq2SeqLM.from_pretrained(
+        config.MODEL_NAME,
+        quantization_config=quantization_config,
+        device_map="auto",
+    )
+    tokenizer = AutoTokenizer.from_pretrained(
+        config.MODEL_NAME, src_lang=config.SRC_LANG, tgt_lang=config.TGT_LANG
+    )
+
+    lora_config = LoraConfig(
+        r=config.LORA_R,
+        lora_alpha=config.LORA_ALPHA,
+        target_modules=["q_proj", "v_proj"],
+        lora_dropout=config.LORA_DROPOUT,
+        bias="none",
+        task_type=TaskType.SEQ_2_SEQ_LM
+    )
+
+    model = get_peft_model(model, lora_config)
+    model.print_trainable_parameters()
+
+    return model, tokenizer
 
 
 class CustomModel(nn.Module):
