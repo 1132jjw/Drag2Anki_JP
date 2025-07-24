@@ -2,3 +2,4 @@ data/
 .env
 *epoch-*
 src/__pycache__/
+notebooks/playground.ipynb
