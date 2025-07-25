@@ -14,7 +14,8 @@
     "http://localhost:8765/*",
     "https://jisho.org/*",
     "https://api.openai.com/*",
-    "https://kanjiapi.dev/*"
+    "https://kanjiapi.dev/*",
+    "https://www.google.com/*"
   ],
   "content_scripts": [
     {

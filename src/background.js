@@ -16,6 +16,7 @@ chrome.runtime.onInstalled.addListener(() => {
                     meaning: 'Back'
                 },
                 darkMode: false,
+                googleSearchTranslate: false,
                 fontSize: 14,
                 cacheEnabled: true,
                 shortcut: 'Ctrl+Shift+D'
@@ -51,23 +52,6 @@ chrome.commands.onCommand.addListener((command) => {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
             chrome.tabs.sendMessage(tabs[0].id, { action: 'toggleExtension' });
         });
-    }
-});
-
-// 메시지 처리
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'testAnkiConnection') {
-        testAnkiConnection(request.url)
-            .then(result => sendResponse(result))
-            .catch(error => sendResponse({ success: false, error: error.message }));
-        return true; // 비동기 응답을 위해 true 반환
-    }
-
-    if (request.action === 'fetchWithCORS') {
-        fetchWithCORS(request.url, request.options)
-            .then(response => sendResponse(response))
-            .catch(error => sendResponse({ error: error.message }));
-        return true;
     }
 });
 
@@ -187,6 +171,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         .catch(err => sendResponse({ success: false, error: err.message }));
 
         // true를 리턴하면 sendResponse를 비동기로 사용 가능
+        return true;
+    }
+    else if (request.action === 'testAnkiConnection') {
+        testAnkiConnection(request.url)
+            .then(result => sendResponse(result))
+            .catch(error => sendResponse({ success: false, error: error.message }));
+        return true; // 비동기 응답을 위해 true 반환
+    }
+    else if (request.action === 'fetchWithCORS') {
+        fetchWithCORS(request.url, request.options)
+            .then(response => sendResponse(response))
+            .catch(error => sendResponse({ error: error.message }));
         return true;
     }
 });
