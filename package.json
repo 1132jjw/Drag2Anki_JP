@@ -1,0 +1,30 @@
+{
+  "name": "drag2anki_jp",
+  "version": "1.0.0",
+  "description": "> 일본어 모르는 단어, 이제 드래그만 하면 뜻과 읽는 법을 한 번에!   > 뜻/후리가나/한자 정보/Anki 카드 저장까지 지원하는 일본어 학습 크롬 익스텐션",
+  "main": "webpack.config.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "webpack --mode production",
+    "dev": "webpack --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/1132jjw/Drag2Anki_JP.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/1132jjw/Drag2Anki_JP/issues"
+  },
+  "homepage": "https://github.com/1132jjw/Drag2Anki_JP#readme",
+  "devDependencies": {
+    "@babel/core": "^7.28.0",
+    "@babel/preset-env": "^7.28.0",
+    "babel-loader": "^10.0.0",
+    "copy-webpack-plugin": "^13.0.0",
+    "webpack": "^5.100.2",
+    "webpack-cli": "^6.0.1"
+  }
+}
