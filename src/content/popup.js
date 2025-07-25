@@ -1,6 +1,7 @@
 // popup.js
 
 import { loadWordInfo } from './api';
+import { saveToAnki, saveKanjiToAnki } from './anki';
 
 export let popup = null;
 
