@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
         fieldReading: document.getElementById('fieldReading'),
         fieldKanji: document.getElementById('fieldKanji'),
         darkMode: document.getElementById('darkMode'),
+        googleSearchTranslate: document.getElementById('googleSearchTranslate'),
         fontSize: document.getElementById('fontSize'),
         fontSizeValue: document.getElementById('fontSizeValue'),
         cacheEnabled: document.getElementById('cacheEnabled'),
@@ -34,6 +35,7 @@ document.addEventListener('DOMContentLoaded', function() {
             kanji: 'Kanji'
         },
         darkMode: false,
+        googleSearchTranslate: false,
         fontSize: 14,
         cacheEnabled: true,
         shortcut: 'Ctrl+Shift+D'
@@ -59,6 +61,7 @@ document.addEventListener('DOMContentLoaded', function() {
             elements.fieldReading.value = settings.fieldMapping.reading;
             elements.fieldKanji.value = settings.fieldMapping.kanji;
             elements.darkMode.checked = settings.darkMode;
+            elements.googleSearchTranslate.checked = settings.googleSearchTranslate;
             elements.fontSize.value = settings.fontSize;
             elements.fontSizeValue.textContent = settings.fontSize + 'px';
             elements.cacheEnabled.checked = settings.cacheEnabled;
@@ -84,6 +87,11 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 document.body.classList.remove('dark-mode');
             }
+        });
+
+        // Google 검색 시 자동 번역 토글
+        elements.googleSearchTranslate.addEventListener('change', function() {
+            chrome.storage.sync.set({ drag2anki_settings: { googleSearchTranslate: this.checked } });
         });
 
         // 연결 테스트
@@ -185,6 +193,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 kanji: elements.fieldKanji.value.trim()
             },
             darkMode: elements.darkMode.checked,
+            googleSearchTranslate: elements.googleSearchTranslate.checked,
             fontSize: parseInt(elements.fontSize.value),
             cacheEnabled: elements.cacheEnabled.checked,
             shortcut: elements.shortcut.value.trim()

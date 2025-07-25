@@ -4,9 +4,22 @@ import { getSelectedTextWithoutRuby, isJapaneseTextOnly, removeJapaneseParens } 
 import { showPopup, hidePopup } from './popup';
 import { popup } from './popup';
 
-export function handleTextSelection(event) {
+export function handleTextSelection(arg) {
     // 팝업이 열려있으면 무시
-    if (popup && popup.contains(event.target)) return;
+    if (popup && popup.contains(arg?.target)) return;
+
+    if (typeof arg === 'string') {
+        const text = arg.trim();
+        const searchBox = document.querySelector('textarea[name="q"], input[name="q"]');
+        if (text && isJapaneseTextOnly(text)) {
+            const normalizedText = removeJapaneseParens(text);
+            const rect = searchBox.getBoundingClientRect();
+            showPopup(text, rect, normalizedText);
+        } else {
+            hidePopup();
+        }
+        return;
+    }
 
     setTimeout(() => {
         const selectedText = getSelectedTextWithoutRuby();
