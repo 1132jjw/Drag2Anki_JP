@@ -12,6 +12,7 @@ export let settings = {
         kanji: 'Kanji'
     },
     darkMode: false,
+    googleSearchTranslate: false,
     fontSize: 14,
     cacheEnabled: true,
     shortcut: 'Ctrl+Shift+D'
@@ -25,9 +26,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 export function loadSettings() {
-    chrome.storage.sync.get(['drag2anki_settings'], (result) => {
-        if (result.drag2anki_settings) {
-            settings = { ...settings, ...result.drag2anki_settings };
-        }
+    return new Promise((resolve) => {
+        chrome.storage.sync.get(['drag2anki_settings'], (result) => {
+            if (result.drag2anki_settings) {
+                settings = { ...settings, ...result.drag2anki_settings };
+                resolve(settings);
+            }
+        });
     });
 }
