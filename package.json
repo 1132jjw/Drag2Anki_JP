@@ -4,7 +4,9 @@
   "description": "> 일본어 모르는 단어, 이제 드래그만 하면 뜻과 읽는 법을 한 번에!   > 뜻/후리가나/한자 정보/Anki 카드 저장까지 지원하는 일본어 학습 크롬 익스텐션",
   "main": "webpack.config.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "build": "webpack --mode production",
     "dev": "webpack --watch"
   },
@@ -25,6 +27,24 @@
     "babel-loader": "^10.0.0",
     "copy-webpack-plugin": "^13.0.0",
     "webpack": "^5.100.2",
-    "webpack-cli": "^6.0.1"
+    "webpack-cli": "^6.0.1",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "@babel/preset-env": "^7.28.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
+    "moduleFileExtensions": ["js", "json"],
+    "transform": {
+      "^.+\\.js$": "babel-jest"
+    },
+    "testMatch": [
+      "<rootDir>/tests/**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/**/*.bundle.js"
+    ]
   }
 }
