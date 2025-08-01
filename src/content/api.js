@@ -79,6 +79,11 @@ export async function fetchLLMMeaning(text) {
                     content: `
                     [응답 형식]
 
+                    - 단어를 읽을 수 있는 후리가나 방식이 여러 개가 있다면 여러 개 모두 반환
+                    - 가능한 한 전체 응답이 200 토큰을 넘지 않도록 간결하게 작성
+
+                    [출력 포맷 예시]
+
                     후리가나: [단어의 후리가나]
                     뜻:
                     [품사]
@@ -88,7 +93,7 @@ export async function fetchLLMMeaning(text) {
 
                     ⸻
 
-                    예시
+                    [예시]
                     입력: 偶然
                     출력:
                     후리가나: ぐうぜん
@@ -110,7 +115,7 @@ export async function fetchLLMMeaning(text) {
                     content: text
                 }
             ],
-            max_tokens: 100
+            max_tokens: 200
         })
     });
 
