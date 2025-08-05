@@ -4,6 +4,7 @@ import { settings } from './settings';
 import { getHanjaInfo } from './hanja';
 import { safeValue } from './utils';
 import { displayWordInfo, displayError } from './popup';
+import { getKanjiFromDB, setKanjiToDB, hasKanjiInDB } from './firebase';
 
 export let currentWordInfo = null; // 전역 선언
 
@@ -20,21 +21,37 @@ export async function fetchJishoData(text) {
 export async function fetchKanjiData(text) {
     const kanjiList = text.match(/[\u4E00-\u9FAF]/g) || [];
     const kanjiData = [];
+    
     for (const kanji of kanjiList) {
-        console.log(kanji);
+        console.log(`한자 정보 조회: ${kanji}`);
         let data = {};
+        
+        // 1. Firebase DB에서 먼저 조회
+        try {
+            const dbData = await getKanjiFromDB(kanji);
+            if (dbData) {
+                console.log(`Firebase DB에서 한자 정보 찾음: ${kanji}`);
+                kanjiData.push(dbData);
+                continue; // DB에 있으면 다음 한자로
+            }
+        } catch (error) {
+            console.error(`Firebase DB 조회 오류 (${kanji}):`, error);
+        }
+        
+        // 2. DB에 없으면 외부 API에서 조회
         try {
             const response = await fetch(`https://kanjiapi.dev/v1/kanji/${kanji}`);
             data = await response.json();
         } catch (error) {
-            console.error(`한자 정보 로드 오류 (${kanji}):`, error);
+            console.error(`KanjiAPI 조회 오류 (${kanji}):`, error);
         }
 
+        // 3. 한국 한자 정보 추가
         const koreanHanjaInfo = await getHanjaInfo(kanji);
         if (koreanHanjaInfo) {
             data.korean = koreanHanjaInfo;
         } else {
-            // 한자 1글자만 LLM에 넣어서 설명 받기
+            // 4. LLM에서 한자 설명 받기
             let llmMeaning = null;
             try {
                 llmMeaning = await fetchLLMMeaning(kanji);
@@ -55,6 +72,14 @@ export async function fetchKanjiData(text) {
         }
 
         kanjiData.push(data);
+        
+        // 5. 새로 조회한 데이터를 Firebase DB에 비동기로 저장
+        try {
+            await setKanjiToDB(kanji, data);
+            console.log(`Firebase DB에 한자 정보 저장: ${kanji}`);
+        } catch (error) {
+            console.error(`Firebase DB 저장 오류 (${kanji}):`, error);
+        }
     }
 
     return kanjiData;
@@ -72,7 +97,7 @@ export async function fetchLLMMeaning(text) {
             'Authorization': `Bearer ${settings.openaiApiKey}`
         },
         body: JSON.stringify({
-            model: 'gpt-4.1-mini-2025-04-14',
+            model: 'gpt-4.1-2025-04-14',
             messages: [
                 {
                     role: 'system',
