@@ -1,4 +1,5 @@
 // utils.js
+import kuromoji from 'kuromoji';
 
 export function isKanaOnly(text) {
     const kanaRegex = /^[\u3040-\u309F\u30A0-\u30FF]+$/;
@@ -46,15 +47,18 @@ export function getSelectedTextWithoutRuby() {
 }
 
 export function tokenize(text) {
-    return kuromoji.builder({ dicPath: "https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict/" })
+    return new Promise((resolve, reject) => {
+        kuromoji.builder({ dicPath: chrome.runtime.getURL('dict') })
             .build(function (err, tokenizer) {
                 if (err) {
                     console.error("분석기 생성 실패:", err);
+                    reject(err);
                     return;
                 }
                 const tokens = tokenizer.tokenize(text);
-                return tokens;
+                resolve(tokens);
             });
+    });
 }
 
 export function isSingleWord(tokens) {

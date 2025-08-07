@@ -27,6 +27,12 @@ module.exports = {
       }
     ]
   },
+  resolve: {
+    fallback: {
+      "path": require.resolve("path-browserify"),
+      "fs": false
+    }
+  },
   plugins: [
     new webpack.DefinePlugin({
       'process.env.FIREBASE_API_KEY': JSON.stringify(process.env.FIREBASE_API_KEY),
@@ -43,7 +49,8 @@ module.exports = {
         { from: 'popup.html', to: '' },
         { from: 'popup.css', to: '' },
         { from: 'content.css', to: '' },
-        { from: 'data', to: 'data' }
+        { from: 'data', to: 'data' },
+        { from: 'node_modules/kuromoji/dict', to: 'dict' }
       ]
     })
   ]

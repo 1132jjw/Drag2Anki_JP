@@ -1,10 +1,10 @@
 // api.js
 
-import { settings } from './settings';
 import { getHanjaInfo } from './hanja';
-import { safeValue } from './utils';
+import { safeValue, tokenize, isSingleWord } from './utils';
 import { displayWordInfo, displayError } from './popup';
-import { getKanjiFromDB, setKanjiToDB, hasKanjiInDB } from './firebase';
+import { getKanjiFromDB, setKanjiToDB, getWordFromDB, setWordToDB } from './firebase';
+import { settings } from './settings';
 
 export let currentWordInfo = null; // 전역 선언
 
@@ -90,12 +90,23 @@ export async function fetchLLMMeaning(text) {
         return null;
     }
 
-    const tokens = tokenize(text);
+    const tokens = await tokenize(text);
     const isWord = isSingleWord(tokens);
 
-    // if (isWord) {
-    //     return null;
-    // }
+    if (isWord) {
+        try {
+            const dbData = await getWordFromDB(text);
+            if (dbData) {
+                console.log(`Firebase DB에서 단어 정보 찾음: ${text}`);
+                return dbData;
+            }
+        } catch (error) {
+            console.error(`Firebase DB 조회 오류 (${text}):`, error);
+        }
+    } else {
+        // 추후 여기에 직접 만든 API를 사용하여 정보를 가져오도록 수정
+        console.log(`단어가 여러 개: ${text}`);   
+    }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -157,10 +168,22 @@ export async function fetchLLMMeaning(text) {
     // 후리가나와 뜻을 분리하여 객체로 반환
     const readingMatch = content.match(/후리가나:\s*(.+)/);
     const meaningMatch = content.match(/뜻:\s*([\s\S]*)/);
-    
+    const reading = readingMatch ? readingMatch[1].trim() : '';
+    const meaning = meaningMatch ? meaningMatch[1].trim() : content;
+
+    // 단어일 경우 DB에 저장
+    if (isWord) {
+        try {
+            await setWordToDB(text, { reading: reading, meaning: meaning });
+            console.log(`Firebase DB에 단어 정보 저장: ${text}`);
+        } catch (error) {
+            console.error(`Firebase DB 저장 오류 (${text}):`, error);
+        }
+    }
+
     return {
-        reading: readingMatch ? readingMatch[1].trim() : '',
-        meaning: meaningMatch ? meaningMatch[1].trim() : content
+        reading: reading,
+        meaning: meaning
     };
 }
 
@@ -179,16 +202,22 @@ export async function loadWordInfo(text) {
 
         if (!wordInfo) {
             // API 요청
-            const [jishoData, llmMeaning, kanjiData] = await Promise.allSettled([
+            const [jishoResult, llmMeaningResult, kanjiResult] = await Promise.allSettled([
                 fetchJishoData(text),
-                fetchLLMMeaning(text),
-                fetchKanjiData(text)
+                fetchLLMMeaning(text), // settings 인자 제거
+                fetchKanjiData(text)  // settings 인자 제거
             ]);
 
+            console.log('API 요청 결과:', {
+                jishoResult,
+                llmMeaningResult,
+                kanjiResult
+            });
+
             wordInfo = {
-                jisho: safeValue(jishoData),
-                llmMeaning: safeValue(llmMeaning),
-                kanji: safeValue(kanjiData)
+                jisho: safeValue(jishoResult),
+                llmMeaning: safeValue(llmMeaningResult),
+                kanji: safeValue(kanjiResult)
             };
 
             console.log('단어 정보:', wordInfo);

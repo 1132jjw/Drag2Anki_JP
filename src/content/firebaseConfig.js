@@ -3,9 +3,9 @@
  * 모든 사용자가 동일한 Firebase DB에 연결
  */
 
-// Firebase SDK import (npm 패키지에서)
-import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+// Firebase SDK import (compat version for webpack v5)
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/firestore';
 
 // 공통 Firebase 설정 (환경변수에서 가져옴)
 const FIREBASE_CONFIG = {
@@ -16,12 +16,6 @@ const FIREBASE_CONFIG = {
     messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
     appId: process.env.FIREBASE_APP_ID
 };
-
-// Firebase 프로젝트 설정 방법:
-// 1. https://console.firebase.google.com/ 에서 새 프로젝트 생성
-// 2. Firestore Database 활성화 (테스트 모드로 시작)
-// 3. 웹 앱 추가하고 설정 정보 복사
-// 4. 위의 FIREBASE_CONFIG 객체에 실제 값들 입력
 
 let firebaseApp = null;
 let db = null;
@@ -36,9 +30,13 @@ export async function initializeFirebase() {
     }
 
     try {
-        // Firebase 앱 초기화 (정적 import 사용)
-        firebaseApp = initializeApp(FIREBASE_CONFIG);
-        db = getFirestore(firebaseApp);
+        // Firebase 앱 초기화 (compat)
+        if (!firebase.apps.length) {
+            firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
+        } else {
+            firebaseApp = firebase.app(); // 이미 초기화된 경우 기존 앱 사용
+        }
+        db = firebaseApp.firestore();
         
         console.log('Firebase 초기화 완료');
         return firebaseApp;
