@@ -1,2 +1,10 @@
 /dist
 /translation
+
+# 환경변수 파일 (민감한 정보 포함)
+.env
+.env.local
+.env.*.local
+
+# Firebase 설정 파일
+firebase-config.local.js
