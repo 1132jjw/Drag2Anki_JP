@@ -90,6 +90,13 @@ export async function fetchLLMMeaning(text) {
         return null;
     }
 
+    const tokens = tokenize(text);
+    const isWord = isSingleWord(tokens);
+
+    // if (isWord) {
+    //     return null;
+    // }
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {

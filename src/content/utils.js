@@ -44,3 +44,34 @@ export function getSelectedTextWithoutRuby() {
     // 텍스트만 추출
     return tempDiv.textContent.trim();
 }
+
+export function tokenize(text) {
+    return kuromoji.builder({ dicPath: "https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict/" })
+            .build(function (err, tokenizer) {
+                if (err) {
+                    console.error("분석기 생성 실패:", err);
+                    return;
+                }
+                const tokens = tokenizer.tokenize(text);
+                return tokens;
+            });
+}
+
+export function isSingleWord(tokens) {
+    if (!tokens || tokens.length === 0) {
+        return false;
+    }
+
+    // 토큰이 1개 일때는 무조건 DB에 저장
+    if (tokens.length === 1) {
+        return true;
+    }
+
+    const independentPos = ['名詞', '動詞', '形容詞', '副詞', '連体詞', '接続詞', '感動詞', '形状詞'];
+    
+    // 1. 자립어의 개수를 센다.
+    const independentWordCount = tokens.filter(token => independentPos.includes(token.pos)).length;
+
+    // 2. 자립어가 정확히 1개일 때만 '의미 단위'일 가능성이 있다.
+    return independentWordCount === 1;
+}
