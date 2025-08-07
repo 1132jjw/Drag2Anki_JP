@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase 한자 DB 테스트</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            background: #007cba;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #005a87;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 3px;
+            white-space: pre-wrap;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .success {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔥 Firebase 한자 DB 테스트</h1>
+    
+    <div class="test-section">
+        <h3>1. Firebase 연결 테스트</h3>
+        <button onclick="testConnection()">연결 테스트</button>
+        <div id="connectionResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>2. 한자 정보 조회 테스트</h3>
+        <input type="text" id="kanjiInput" placeholder="한자 입력 (예: 愛)" value="愛">
+        <button onclick="testGetKanji()">조회</button>
+        <div id="getResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>3. 한자 정보 저장 테스트</h3>
+        <input type="text" id="saveKanjiInput" placeholder="한자" value="愛">
+        <textarea id="saveInfoInput" placeholder="한자 정보 (JSON 형태)" rows="4">
+{
+  "character": "愛",
+  "meaning": "사랑",
+  "reading": "あい",
+  "strokes": 13,
+  "grade": 4
+}</textarea>
+        <br>
+        <button onclick="testSetKanji()">저장</button>
+        <div id="setResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>4. 한자 존재 확인 테스트</h3>
+        <input type="text" id="hasKanjiInput" placeholder="한자 입력" value="愛">
+        <button onclick="testHasKanji()">존재 확인</button>
+        <div id="hasResult" class="result"></div>
+    </div>
+
+    <script type="module">
+        // Firebase 모듈 import
+        import { initializeFirebase, getDB } from './src/content/firebaseConfig.js';
+        import { getKanjiFromDB, setKanjiToDB, hasKanjiInDB, testDBConnection } from './src/content/firebase.js';
+        
+        // 전역 함수로 등록
+        window.testConnection = async function() {
+            const result = document.getElementById('connectionResult');
+            result.textContent = '연결 테스트 중...';
+            result.className = 'result';
+            
+            try {
+                const success = await testDBConnection();
+                if (success) {
+                    result.textContent = '✅ Firebase 연결 성공!';
+                    result.className = 'result success';
+                } else {
+                    result.textContent = '❌ Firebase 연결 실패';
+                    result.className = 'result error';
+                }
+            } catch (error) {
+                result.textContent = `❌ 연결 오류: ${error.message}`;
+                result.className = 'result error';
+            }
+        };
+        
+        window.testGetKanji = async function() {
+            const kanji = document.getElementById('kanjiInput').value;
+            const result = document.getElementById('getResult');
+            
+            if (!kanji) {
+                result.textContent = '한자를 입력하세요.';
+                result.className = 'result error';
+                return;
+            }
+            
+            result.textContent = '조회 중...';
+            result.className = 'result';
+            
+            try {
+                const data = await getKanjiFromDB(kanji);
+                if (data) {
+                    result.textContent = `✅ 조회 성공:\n${JSON.stringify(data, null, 2)}`;
+                    result.className = 'result success';
+                } else {
+                    result.textContent = `❌ 한자 '${kanji}'가 DB에 없습니다.`;
+                    result.className = 'result error';
+                }
+            } catch (error) {
+                result.textContent = `❌ 조회 오류: ${error.message}`;
+                result.className = 'result error';
+            }
+        };
+        
+        window.testSetKanji = async function() {
+            const kanji = document.getElementById('saveKanjiInput').value;
+            const infoText = document.getElementById('saveInfoInput').value;
+            const result = document.getElementById('setResult');
+            
+            if (!kanji || !infoText) {
+                result.textContent = '한자와 정보를 모두 입력하세요.';
+                result.className = 'result error';
+                return;
+            }
+            
+            try {
+                const info = JSON.parse(infoText);
+                result.textContent = '저장 중...';
+                result.className = 'result';
+                
+                const success = await setKanjiToDB(kanji, info);
+                if (success) {
+                    result.textContent = `✅ 한자 '${kanji}' 저장 성공!`;
+                    result.className = 'result success';
+                } else {
+                    result.textContent = `❌ 한자 '${kanji}' 저장 실패`;
+                    result.className = 'result error';
+                }
+            } catch (error) {
+                result.textContent = `❌ 저장 오류: ${error.message}`;
+                result.className = 'result error';
+            }
+        };
+        
+        window.testHasKanji = async function() {
+            const kanji = document.getElementById('hasKanjiInput').value;
+            const result = document.getElementById('hasResult');
+            
+            if (!kanji) {
+                result.textContent = '한자를 입력하세요.';
+                result.className = 'result error';
+                return;
+            }
+            
+            result.textContent = '확인 중...';
+            result.className = 'result';
+            
+            try {
+                const exists = await hasKanjiInDB(kanji);
+                if (exists) {
+                    result.textContent = `✅ 한자 '${kanji}'가 DB에 존재합니다.`;
+                    result.className = 'result success';
+                } else {
+                    result.textContent = `❌ 한자 '${kanji}'가 DB에 없습니다.`;
+                    result.className = 'result error';
+                }
+            } catch (error) {
+                result.textContent = `❌ 확인 오류: ${error.message}`;
+                result.className = 'result error';
+            }
+        };
+        
+        // 페이지 로드 시 Firebase 초기화
+        window.addEventListener('load', async () => {
+            try {
+                await initializeFirebase();
+                console.log('Firebase 초기화 완료');
+            } catch (error) {
+                console.error('Firebase 초기화 실패:', error);
+            }
+        });
+    </script>
+</body>
+</html>
