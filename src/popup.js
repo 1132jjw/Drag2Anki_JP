@@ -288,8 +288,8 @@ document.addEventListener('DOMContentLoaded', function() {
     versionInfo.innerHTML = `
         <small>
             ${manifest.name} v${manifest.version}<br>
-            <a href="https://github.com/drag2anki/drag2anki-jp" target="_blank">GitHub</a> | 
-            <a href="mailto:support@drag2anki.com">문의</a>
+            <a href="https://github.com/1132jjw/Drag2Anki_JP" target="_blank">GitHub</a> | 
+            <a href="mailto:draganki01@gmail.com">문의</a>
         </small>
     `;
     document.querySelector('.info').appendChild(versionInfo);
