@@ -72,11 +72,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function setupEventListeners() {
-        // 폰트 크기 슬라이더
-        elements.fontSize.addEventListener('input', function() {
-            elements.fontSizeValue.textContent = this.value + 'px';
-        });
-
         // 다크 모드 토글
         elements.darkMode.addEventListener('change', function() {
             if (this.checked) {
