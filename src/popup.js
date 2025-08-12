@@ -12,8 +12,6 @@ document.addEventListener('DOMContentLoaded', function() {
         fieldKanji: document.getElementById('fieldKanji'),
         darkMode: document.getElementById('darkMode'),
         googleSearchTranslate: document.getElementById('googleSearchTranslate'),
-        fontSize: document.getElementById('fontSize'),
-        fontSizeValue: document.getElementById('fontSizeValue'),
         cacheEnabled: document.getElementById('cacheEnabled'),
         testConnection: document.getElementById('testConnection'),
         connectionStatus: document.getElementById('connectionStatus'),
@@ -35,7 +33,6 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         darkMode: false,
         googleSearchTranslate: false,
-        fontSize: 14,
         cacheEnabled: true
     };
 
@@ -60,8 +57,6 @@ document.addEventListener('DOMContentLoaded', function() {
             elements.fieldKanji.value = settings.fieldMapping.kanji;
             elements.darkMode.checked = settings.darkMode;
             elements.googleSearchTranslate.checked = settings.googleSearchTranslate;
-            elements.fontSize.value = settings.fontSize;
-            elements.fontSizeValue.textContent = settings.fontSize + 'px';
             elements.cacheEnabled.checked = settings.cacheEnabled;
 
             // 다크 모드 적용
@@ -178,7 +173,6 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             darkMode: elements.darkMode.checked,
             googleSearchTranslate: elements.googleSearchTranslate.checked,
-            fontSize: parseInt(elements.fontSize.value),
             cacheEnabled: elements.cacheEnabled.checked
         };
 
