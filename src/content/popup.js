@@ -2,17 +2,19 @@
 
 import { loadWordInfo } from './api';
 import { saveToAnki, saveKanjiToAnki } from './anki';
+import contentCss from '../../content.css';
 
 export let popup = null;
 
 export function showPopup(displayText, rect, normalizedText) {
     hidePopup();
 
-    popup = createPopup(displayText, rect);
-    document.body.appendChild(popup);
+    const container = createPopup(displayText, rect);
+    popup = container; // popup 변수가 container를 참조하도록 변경
+    document.body.appendChild(container);
     
     // 팝업 위치 조정
-    adjustPopupPosition(popup, rect);
+    adjustPopupPosition(container, rect);
     
     // 단어 정보 로드 시 normalizedText 사용
     loadWordInfo(normalizedText);
@@ -26,8 +28,15 @@ export function hidePopup() {
 }
 
 export function createPopup(text, rect) {
+    const container = document.createElement('div');
+    container.id = 'drag2anki-jp-container';
+    const shadowRoot = container.attachShadow({ mode: 'open' });
+
+    const style = document.createElement('style');
+    style.textContent = contentCss.default ? contentCss.default : contentCss;
+    shadowRoot.appendChild(style);
+
     const popup = document.createElement('div');
-    popup.id = 'drag2anki-popup';
     popup.className = 'drag2anki-popup';
 
     popup.innerHTML = `
@@ -65,10 +74,14 @@ export function createPopup(text, rect) {
         btn.addEventListener('click', (e) => switchTab(e.target.dataset.tab));
     });
 
-    return popup;
+    shadowRoot.appendChild(popup);
+
+    return container;
 }
 
-export function adjustPopupPosition(popup, rect) {
+export function adjustPopupPosition(container, rect) {
+    const popup = container.shadowRoot.querySelector('.drag2anki-popup');
+    if (!popup) return;
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     const popupRect = popup.getBoundingClientRect();
@@ -91,10 +104,12 @@ export function adjustPopupPosition(popup, rect) {
 }
 
 export function displayWordInfo(wordInfo) {
-    const loadingEl = popup.querySelector('.loading');
-    const tabsEl = popup.querySelector('.tabs');
-    const meaningTab = popup.querySelector('#meaning-tab');
-    const kanjiTab = popup.querySelector('#kanji-tab');
+    if (!popup || !popup.shadowRoot) return;
+    const shadowRoot = popup.shadowRoot;
+    const loadingEl = shadowRoot.querySelector('.loading');
+    const tabsEl = shadowRoot.querySelector('.tabs');
+    const meaningTab = shadowRoot.querySelector('#meaning-tab');
+    const kanjiTab = shadowRoot.querySelector('#kanji-tab');
 
     loadingEl.style.display = 'none';
     tabsEl.style.display = 'flex';
@@ -145,10 +160,10 @@ export function displayWordInfo(wordInfo) {
         kanjiHtml = '<div class="no-kanji">한자 정보가 없습니다.</div>';
     }
 
-    document.querySelector('#kanji-tab .kanji-info').innerHTML = kanjiHtml;
+    shadowRoot.querySelector('#kanji-tab .kanji-info').innerHTML = kanjiHtml;
     // 한자 저장 버튼 이벤트 위임 (뜻 탭용) 제거
     // 한자 탭용 기존 이벤트 위임 유지
-    const kanjiInfoEl = document.querySelector('#kanji-tab .kanji-info');
+    const kanjiInfoEl = shadowRoot.querySelector('#kanji-tab .kanji-info');
     if (kanjiInfoEl) {
         kanjiInfoEl.addEventListener('click', async function(e) {
             const btn = e.target.closest('.kanji-save-btn');
@@ -163,15 +178,20 @@ export function displayWordInfo(wordInfo) {
 }
 
 export function displayError(message) {
-    const loadingEl = popup.querySelector('.loading');
-    loadingEl.innerHTML = `<div class="error">${message}</div>`;
+    if (!popup || !popup.shadowRoot) return;
+    const shadowRoot = popup.shadowRoot;
+    const loadingEl = shadowRoot.querySelector('.loading');
+    if (loadingEl) {
+        loadingEl.innerHTML = `<div class="error">${message}</div>`;
+    }
 }
 
 export function switchTab(tabName) {
-    console.log(`Switching to tab: ${tabName}`);
-    popup.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    popup.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+    if (!popup || !popup.shadowRoot) return;
+    const shadowRoot = popup.shadowRoot;
+    shadowRoot.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    shadowRoot.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
 
-    popup.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-    popup.querySelector(`#${tabName}-tab`).classList.add('active');
+    shadowRoot.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+    shadowRoot.querySelector(`#${tabName}-tab`).classList.add('active');
 }
