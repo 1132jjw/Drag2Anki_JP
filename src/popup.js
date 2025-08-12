@@ -192,8 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
             darkMode: elements.darkMode.checked,
             googleSearchTranslate: elements.googleSearchTranslate.checked,
             fontSize: parseInt(elements.fontSize.value),
-            cacheEnabled: elements.cacheEnabled.checked,
-            shortcut: elements.shortcut.value.trim()
+            cacheEnabled: elements.cacheEnabled.checked
         };
 
         chrome.storage.sync.set({ drag2anki_settings: settings }, () => {
