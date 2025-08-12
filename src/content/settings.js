@@ -1,7 +1,6 @@
 // settings.js
 
 export let settings = {
-    openaiApiKey: '',
     ankiConnectUrl: 'http://localhost:8765',
     deckName: 'Japanese',
     noteType: 'Basic',
@@ -29,8 +28,8 @@ export function loadSettings() {
         chrome.storage.sync.get(['drag2anki_settings'], (result) => {
             if (result.drag2anki_settings) {
                 settings = { ...settings, ...result.drag2anki_settings };
-                resolve(settings);
             }
+            resolve(settings);
         });
     });
 }

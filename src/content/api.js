@@ -86,10 +86,6 @@ export async function fetchKanjiData(text) {
 }
 
 export async function fetchLLMMeaning(text) {
-    if (!settings.openaiApiKey) {
-        return null;
-    }
-
     const tokens = await tokenize(text);
     const isWord = isSingleWord(tokens);
 
@@ -112,7 +108,7 @@ export async function fetchLLMMeaning(text) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${settings.openaiApiKey}`
+            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
         },
         body: JSON.stringify({
             model: 'gpt-4.1-2025-04-14',
