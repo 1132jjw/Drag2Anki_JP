@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // DOM 요소 가져오기
     const elements = {
         ankiUrl: document.getElementById('ankiUrl'),
-        openaiKey: document.getElementById('openaiKey'),
+
         deckName: document.getElementById('deckName'),
         noteType: document.getElementById('noteType'),
         fieldWord: document.getElementById('fieldWord'),
@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 기본 설정값
     const defaultSettings = {
-        openaiApiKey: '',
+
         ankiConnectUrl: 'http://localhost:8765',
         deckName: 'Japanese',
         noteType: 'Basic',
@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // 폼 필드에 값 설정
             elements.ankiUrl.value = settings.ankiConnectUrl;
-            elements.openaiKey.value = settings.openaiApiKey;
+
             elements.deckName.value = settings.deckName;
             elements.noteType.value = settings.noteType;
             elements.fieldWord.value = settings.fieldMapping.word;
@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 입력 필드 유효성 검사
         elements.ankiUrl.addEventListener('blur', validateUrl);
-        elements.openaiKey.addEventListener('blur', validateApiKey);
+
     }
 
     function validateUrl() {
@@ -105,14 +105,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (url && !isValidUrl(url)) {
             showStatus('유효하지 않은 URL입니다.', 'error');
             elements.ankiUrl.focus();
-        }
-    }
-
-    function validateApiKey() {
-        const key = elements.openaiKey.value.trim();
-        if (key && !key.startsWith('sk-')) {
-            showStatus('OpenAI API 키는 "sk-"로 시작해야 합니다.', 'error');
-            elements.openaiKey.focus();
         }
     }
 
@@ -174,7 +166,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const settings = {
-            openaiApiKey: elements.openaiKey.value.trim(),
+
             ankiConnectUrl: elements.ankiUrl.value.trim(),
             deckName: elements.deckName.value.trim(),
             noteType: elements.noteType.value.trim(),
@@ -233,13 +225,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return false;
         }
 
-        // API 키 유효성 검사 (선택사항)
-        const apiKey = elements.openaiKey.value.trim();
-        if (apiKey && !apiKey.startsWith('sk-')) {
-            showStatus('OpenAI API 키는 "sk-"로 시작해야 합니다.', 'error');
-            elements.openaiKey.focus();
-            return false;
-        }
+
 
         return true;
     }
