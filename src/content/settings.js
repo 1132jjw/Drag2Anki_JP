@@ -14,8 +14,7 @@ export let settings = {
     darkMode: false,
     googleSearchTranslate: false,
     fontSize: 14,
-    cacheEnabled: true,
-    shortcut: 'Ctrl+Shift+D'
+    cacheEnabled: true
 };
 
 // 설정 변경 감지

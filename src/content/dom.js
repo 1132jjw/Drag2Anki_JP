@@ -39,11 +39,6 @@ export function handleTextSelection(arg) {
 
 
 export function handleKeyDown(event) {
-    if (event.ctrlKey && event.shiftKey && event.code === 'KeyD') {
-        event.preventDefault();
-        toggleExtension();
-    }
-
     if (event.key === 'Escape') {
         hidePopup();
     }
@@ -66,9 +61,4 @@ export function injectStyles() {
         /* 기본 스타일은 content.css에서 로드됩니다 */
     `;
     document.head.appendChild(style);
-}
-
-export function toggleExtension() {
-    // 확장 프로그램 활성화/비활성화 토글
-    console.log('Drag2Anki_JP 토글');
 }

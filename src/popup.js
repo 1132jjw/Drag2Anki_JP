@@ -15,7 +15,6 @@ document.addEventListener('DOMContentLoaded', function() {
         fontSize: document.getElementById('fontSize'),
         fontSizeValue: document.getElementById('fontSizeValue'),
         cacheEnabled: document.getElementById('cacheEnabled'),
-        shortcut: document.getElementById('shortcut'),
         testConnection: document.getElementById('testConnection'),
         connectionStatus: document.getElementById('connectionStatus'),
         saveSettings: document.getElementById('saveSettings'),
@@ -37,8 +36,7 @@ document.addEventListener('DOMContentLoaded', function() {
         darkMode: false,
         googleSearchTranslate: false,
         fontSize: 14,
-        cacheEnabled: true,
-        shortcut: 'Ctrl+Shift+D'
+        cacheEnabled: true
     };
 
     // 설정 로드
@@ -65,7 +63,6 @@ document.addEventListener('DOMContentLoaded', function() {
             elements.fontSize.value = settings.fontSize;
             elements.fontSizeValue.textContent = settings.fontSize + 'px';
             elements.cacheEnabled.checked = settings.cacheEnabled;
-            elements.shortcut.value = settings.shortcut;
 
             // 다크 모드 적용
             if (settings.darkMode) {
@@ -272,14 +269,6 @@ document.addEventListener('DOMContentLoaded', function() {
             elements.connectionStatus.className = 'status';
         }, 3000);
     }
-
-    // 키보드 단축키 정보 업데이트
-    chrome.commands.getAll((commands) => {
-        const toggleCommand = commands.find(cmd => cmd.name === 'toggle_extension');
-        if (toggleCommand && toggleCommand.shortcut) {
-            elements.shortcut.value = toggleCommand.shortcut;
-        }
-    });
 
     // 확장 프로그램 정보 표시
     const manifest = chrome.runtime.getManifest();

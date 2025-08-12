@@ -18,8 +18,7 @@ chrome.runtime.onInstalled.addListener(() => {
                 darkMode: false,
                 googleSearchTranslate: false,
                 fontSize: 14,
-                cacheEnabled: true,
-                shortcut: 'Ctrl+Shift+D'
+                cacheEnabled: true
             };
 
             chrome.storage.sync.set({ drag2anki_settings: defaultSettings });
@@ -268,27 +267,4 @@ chrome.runtime.onSuspend.addListener(() => {
 // 오류 처리
 chrome.runtime.onInstalled.addListener(() => {
     chrome.runtime.setUninstallURL('https://forms.gle/feedback');
-});
-
-// 배지 업데이트 (사용량 표시)
-function updateBadge(count) {
-    chrome.action.setBadgeText({
-        text: count > 0 ? count.toString() : ''
-    });
-    chrome.action.setBadgeBackgroundColor({
-        color: '#667eea'
-    });
-}
-
-// 통계 수집 (개인정보 없음)
-chrome.storage.local.get(['usage_stats'], (result) => {
-    if (!result.usage_stats) {
-        chrome.storage.local.set({
-            usage_stats: {
-                wordsLookedUp: 0,
-                cardsSaved: 0,
-                lastUsed: Date.now()
-            }
-        });
-    }
 });
