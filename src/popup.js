@@ -293,19 +293,4 @@ document.addEventListener('DOMContentLoaded', function() {
         </small>
     `;
     document.querySelector('.info').appendChild(versionInfo);
-
-    // 사용 통계 표시 (선택사항)
-    chrome.storage.local.get(['usage_stats'], (result) => {
-        if (result.usage_stats) {
-            const stats = result.usage_stats;
-            const statsInfo = document.createElement('div');
-            statsInfo.className = 'stats-info';
-            statsInfo.innerHTML = `
-                <h4>사용 통계</h4>
-                <p>검색한 단어: ${stats.wordsLookedUp}개</p>
-                <p>저장한 카드: ${stats.cardsSaved}개</p>
-            `;
-            document.querySelector('.info').appendChild(statsInfo);
-        }
-    });
 });
