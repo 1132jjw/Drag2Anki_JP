@@ -12,7 +12,6 @@ export let settings = {
     },
     darkMode: false,
     googleSearchTranslate: false,
-    fontSize: 14,
     cacheEnabled: true
 };
 

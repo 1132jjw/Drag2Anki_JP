@@ -17,7 +17,6 @@ chrome.runtime.onInstalled.addListener(() => {
                 },
                 darkMode: false,
                 googleSearchTranslate: false,
-                fontSize: 14,
                 cacheEnabled: true
             };
 

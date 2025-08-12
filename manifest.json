@@ -21,7 +21,6 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.bundle.js"],
-      "css": ["content.css"],
       "run_at": "document_end"
     }
   ],
