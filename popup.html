@@ -31,8 +31,11 @@
                 <h2>📋 Anki 설정</h2>
 
                 <div class="form-group">
-                    <label for="deckName">덱 이름</label>
-                    <input type="text" id="deckName" placeholder="Japanese">
+                    <label for="deckNameSelect">덱 선택</label>
+                    <div class="deck-selector" style="display: flex; align-items: center;">
+                        <select id="deckNameSelect" style="flex-grow: 1;"></select>
+                        <button id="refreshDecks" title="덱 목록 새로고침" class="refresh-btn" style="margin-left: 8px; padding: 4px 8px; font-size: 16px; line-height: 1; border: none; background: transparent; cursor: pointer;">🔄</button>
+                    </div>
                 </div>
 
                 <div class="form-group">

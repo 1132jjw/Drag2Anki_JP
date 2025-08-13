@@ -152,8 +152,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
     else if (request.type === 'ADD_TO_ANKI') {
-        // AnkiConnect로 fetch
-        fetch('http://localhost:8765/', {
+        fetch(request.ankiConnectUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -170,6 +169,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         // true를 리턴하면 sendResponse를 비동기로 사용 가능
         return true;
+    }
+    else if (request.type === 'GET_DECK_NAMES') {
+        fetch(request.ankiConnectUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'deckNames',
+                version: 6
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            sendResponse({ success: true, result: data.result });
+        })
+        .catch(error => sendResponse({ success: false, error: error.message }));
+        return true; // 비동기 응답 명시
     }
     else if (request.action === 'testAnkiConnection') {
         testAnkiConnection(request.url)

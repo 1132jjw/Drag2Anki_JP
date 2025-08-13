@@ -101,7 +101,7 @@ export async function fetchLLMMeaning(text) {
         }
     } else {
         // 추후 여기에 직접 만든 API를 사용하여 정보를 가져오도록 수정
-        console.log(`단어가 여러 개: ${text}`);   
+        console.log(`단어가 여러 개: ${text}`);
     }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
