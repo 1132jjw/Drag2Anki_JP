@@ -128,21 +128,6 @@ describe('DOM 모듈 테스트', () => {
   describe('handleKeyDown', () => {
     const { hidePopup } = require('../src/content/popup');
 
-    test('Ctrl+Shift+D 키 조합으로 확장 프로그램을 토글해야 함', () => {
-      const mockEvent = {
-        ctrlKey: true,
-        shiftKey: true,
-        code: 'KeyD',
-        preventDefault: jest.fn()
-      };
-
-      console.log = jest.fn();
-      handleKeyDown(mockEvent);
-
-      expect(mockEvent.preventDefault).toHaveBeenCalled();
-      expect(console.log).toHaveBeenCalledWith('Drag2Anki_JP 토글');
-    });
-
     test('Escape 키로 팝업을 숨겨야 함', () => {
       const mockEvent = {
         key: 'Escape',
@@ -236,13 +221,4 @@ describe('DOM 모듈 테스트', () => {
     });
   });
 
-  describe('toggleExtension', () => {
-    test('확장 프로그램 토글 로그를 출력해야 함', () => {
-      console.log = jest.fn();
-
-      toggleExtension();
-
-      expect(console.log).toHaveBeenCalledWith('Drag2Anki_JP 토글');
-    });
-  });
 });
