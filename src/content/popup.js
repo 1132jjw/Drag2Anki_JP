@@ -67,7 +67,13 @@ export function createPopup(text, rect) {
 
     // 이벤트 리스너 추가
     popup.querySelector('.close-btn').addEventListener('click', hidePopup);
-    popup.querySelector('.save-btn').addEventListener('click', () => saveToAnki(text));
+    popup.querySelector('.save-btn').addEventListener('click', () => {
+        // 저장 시점에 최신 덱 설정을 가져와서 전달
+        chrome.storage.sync.get(['drag2anki_settings'], (result) => {
+            const deckName = result.drag2anki_settings?.deckName || 'Japanese'; // 기본값
+            saveToAnki(text, deckName);
+        });
+    });
 
     // 탭 이벤트
     popup.querySelectorAll('.tab-btn').forEach(btn => {
@@ -170,7 +176,11 @@ export function displayWordInfo(wordInfo) {
             if (btn) {
                 const idx = btn.getAttribute('data-kanji-idx');
                 if (wordInfo.kanji && wordInfo.kanji[idx]) {
-                    await saveKanjiToAnki(wordInfo.kanji[idx], btn);
+                    // 저장 시점에 최신 덱 설정을 가져와서 전달
+                    chrome.storage.sync.get(['drag2anki_settings'], (result) => {
+                        const deckName = result.drag2anki_settings?.deckName || 'Japanese'; // 기본값
+                        saveKanjiToAnki(wordInfo.kanji[idx], btn, deckName);
+                    });
                 }
             }
         });

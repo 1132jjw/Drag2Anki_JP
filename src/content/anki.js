@@ -24,7 +24,23 @@ export async function checkDuplicateExact(text) {
     });
 }
 
-export async function saveToAnki(text) {
+export async function getDeckNames() {
+    return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({
+            type: 'GET_DECK_NAMES',
+            ankiConnectUrl: settings.ankiConnectUrl,
+            params: {}
+        }, response => {
+            if (response && response.success) {
+                resolve(response.result);
+            } else {
+                reject(response ? response.error : 'Anki 덱 목록 가져오기 오류');
+            }
+        });
+    });
+}
+
+export async function saveToAnki(text, deckName) {
     try {
         const wordInfo = currentWordInfo; // wordInfo 직접 사용
         console.log('저장할 단어 정보:', wordInfo);
@@ -36,7 +52,7 @@ export async function saveToAnki(text) {
         }
 
         // 카드 생성
-        const note = createAnkiNote(text, wordInfo);
+        const note = createAnkiNote(text, wordInfo, deckName);
         const result = await addNoteToAnki(note);
 
         if (result) {
@@ -51,7 +67,7 @@ export async function saveToAnki(text) {
     }
 }
 
-export function createAnkiNote(text, wordInfo) {
+export function createAnkiNote(text, wordInfo, deckName) {
     const fields = {};
     
     // LLM에서 받아온 후리가나와 뜻 사용
@@ -77,7 +93,7 @@ export function createAnkiNote(text, wordInfo) {
     fields[settings.fieldMapping.meaning] = meaning.replace(/\n/g, '<br>');
 
     return {
-        deckName: settings.deckName,
+        deckName: deckName,
         modelName: settings.noteType,
         fields: fields,
         tags: ['drag2anki']
@@ -104,7 +120,10 @@ export async function addNoteToAnki(note) {
 }
 
 export function showSaveSuccess() {
-    const saveBtn = popup.querySelector('.save-btn');
+    if (!popup || !popup.shadowRoot) return;
+    const saveBtn = popup.shadowRoot.querySelector('.save-btn');
+    if (!saveBtn) return;
+
     const originalText = saveBtn.textContent;
     saveBtn.textContent = '저장됨! [단어]';
     saveBtn.style.backgroundColor = '#4CAF50';
@@ -116,7 +135,10 @@ export function showSaveSuccess() {
 }
 
 export function showSaveError(message) {
-    const saveBtn = popup.querySelector('.save-btn');
+    if (!popup || !popup.shadowRoot) return;
+    const saveBtn = popup.shadowRoot.querySelector('.save-btn');
+    if (!saveBtn) return;
+
     const originalText = saveBtn.textContent;
     saveBtn.textContent = (message || '저장 실패') + ' [단어]';
     saveBtn.style.backgroundColor = '#f44336';
@@ -127,7 +149,7 @@ export function showSaveError(message) {
     }, 2000);
 }
 
-export async function saveKanjiToAnki(kanji, btnEl) {
+export async function saveKanjiToAnki(kanji, btnEl, deckName) {
     try {
         console.log('saveKanjiToAnki', kanji);
         // 중복 체크 (한자 자체로, 정확히 일치하는 경우만)
@@ -137,7 +159,7 @@ export async function saveKanjiToAnki(kanji, btnEl) {
             return showKanjiSaveError(btnEl, '이미 저장됨');
         }
         // 카드 생성
-        const note = createKanjiAnkiNote(kanji);
+        const note = createKanjiAnkiNote(kanji, deckName);
         const result = await addNoteToAnki(note);
         if (result) {
             showKanjiSaveSuccess(btnEl);
@@ -149,7 +171,7 @@ export async function saveKanjiToAnki(kanji, btnEl) {
     }
 }
 
-export function createKanjiAnkiNote(kanji) {
+export function createKanjiAnkiNote(kanji, deckName) {
     const fields = {};
     // Front: just the kanji + [한자]
     fields[settings.fieldMapping.word] = (kanji.kanji || '').trim() + ' [한자]';
@@ -175,7 +197,7 @@ export function createKanjiAnkiNote(kanji) {
         fields[settings.fieldMapping.kanji] = kanji.kanji || '';
     }
     return {
-        deckName: settings.deckName,
+        deckName: deckName,
         modelName: settings.noteType,
         fields: fields,
         tags: ['drag2anki', 'kanji']

@@ -3,8 +3,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // DOM 요소 가져오기
     const elements = {
         ankiUrl: document.getElementById('ankiUrl'),
-
-        deckName: document.getElementById('deckName'),
+        deckNameSelect: document.getElementById('deckNameSelect'),
+        refreshDecks: document.getElementById('refreshDecks'),
         noteType: document.getElementById('noteType'),
         fieldWord: document.getElementById('fieldWord'),
         fieldMeaning: document.getElementById('fieldMeaning'),
@@ -21,7 +21,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 기본 설정값
     const defaultSettings = {
-
         ankiConnectUrl: 'http://localhost:8765',
         deckName: 'Japanese',
         noteType: 'Basic',
@@ -36,20 +35,73 @@ document.addEventListener('DOMContentLoaded', function() {
         cacheEnabled: true
     };
 
-    // 설정 로드
+    // 설정 로드 및 UI 초기화
     loadSettings();
-
-    // 이벤트 리스너 설정
     setupEventListeners();
+
+    // 덱 목록 로드 함수
+    async function loadDeckNames() {
+        showStatus('Anki 덱 목록을 불러오는 중...', 'info');
+        elements.deckNameSelect.disabled = true;
+        elements.refreshDecks.disabled = true;
+
+        try {
+            const ankiConnectUrl = elements.ankiUrl.value.trim();
+            if (!ankiConnectUrl || !isValidUrl(ankiConnectUrl)) {
+                showStatus('유효한 Anki Connect URL을 먼저 입력해주세요.', 'error');
+                elements.deckNameSelect.innerHTML = '<option value="">URL 확인 필요</option>';
+                return;
+            }
+
+            const deckNames = await new Promise((resolve, reject) => {
+                chrome.runtime.sendMessage({
+                    type: 'GET_DECK_NAMES',
+                    ankiConnectUrl: ankiConnectUrl
+                }, response => {
+                    if (response && response.success) {
+                        resolve(response.result);
+                    } else {
+                        reject(new Error(response ? response.error : '알 수 없는 오류'));
+                    }
+                });
+            });
+
+            elements.deckNameSelect.innerHTML = ''; // 기존 옵션 삭제
+            deckNames.forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                elements.deckNameSelect.appendChild(option);
+            });
+
+            // 저장된 덱 이름 선택
+            chrome.storage.sync.get(['drag2anki_settings'], (result) => {
+                const settings = result.drag2anki_settings || defaultSettings;
+                if (settings.deckName && deckNames.includes(settings.deckName)) {
+                    elements.deckNameSelect.value = settings.deckName;
+                }
+            });
+
+            if (deckNames.length > 0) {
+                showStatus('덱 목록을 성공적으로 불러왔습니다.', 'success');
+            } else {
+                showStatus('불러올 덱이 없습니다. Anki를 확인해주세요.', 'info');
+            }
+
+        } catch (error) {
+            showStatus(`덱 목록 로드 실패: ${error.message}`, 'error');
+            elements.deckNameSelect.innerHTML = '<option value="">Anki 연결 확인 필요</option>';
+        } finally {
+            elements.deckNameSelect.disabled = false;
+            elements.refreshDecks.disabled = false;
+        }
+    }
 
     function loadSettings() {
         chrome.storage.sync.get(['drag2anki_settings'], (result) => {
             const settings = result.drag2anki_settings || defaultSettings;
 
-            // 폼 필드에 값 설정
             elements.ankiUrl.value = settings.ankiConnectUrl;
-
-            elements.deckName.value = settings.deckName;
             elements.noteType.value = settings.noteType;
             elements.fieldWord.value = settings.fieldMapping.word;
             elements.fieldMeaning.value = settings.fieldMapping.meaning;
@@ -59,47 +111,30 @@ document.addEventListener('DOMContentLoaded', function() {
             elements.googleSearchTranslate.checked = settings.googleSearchTranslate;
             elements.cacheEnabled.checked = settings.cacheEnabled;
 
-            // 다크 모드 적용
             if (settings.darkMode) {
                 document.body.classList.add('dark-mode');
             }
+            
+            loadDeckNames();
         });
     }
 
     function setupEventListeners() {
-        // 다크 모드 토글
         elements.darkMode.addEventListener('change', function() {
-            if (this.checked) {
-                document.body.classList.add('dark-mode');
-            } else {
-                document.body.classList.remove('dark-mode');
-            }
+            document.body.classList.toggle('dark-mode', this.checked);
         });
 
-        // Google 검색 시 자동 번역 토글
-        elements.googleSearchTranslate.addEventListener('change', function() {
-            chrome.storage.sync.set({ drag2anki_settings: { googleSearchTranslate: this.checked } });
-        });
-
-        // 연결 테스트
         elements.testConnection.addEventListener('click', testAnkiConnection);
-
-        // 설정 저장
         elements.saveSettings.addEventListener('click', saveSettings);
-
-        // 기본값 복원
         elements.resetSettings.addEventListener('click', resetSettings);
-
-        // 입력 필드 유효성 검사
+        elements.refreshDecks.addEventListener('click', loadDeckNames);
         elements.ankiUrl.addEventListener('blur', validateUrl);
-
     }
 
     function validateUrl() {
         const url = elements.ankiUrl.value.trim();
         if (url && !isValidUrl(url)) {
             showStatus('유효하지 않은 URL입니다.', 'error');
-            elements.ankiUrl.focus();
         }
     }
 
@@ -114,56 +149,37 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function testAnkiConnection() {
         const url = elements.ankiUrl.value.trim();
+        if (!validateUrl(url)) return;
 
-        if (!url) {
-            showStatus('Anki Connect URL을 입력해주세요.', 'error');
-            return;
-        }
-
-        if (!isValidUrl(url)) {
-            showStatus('유효하지 않은 URL입니다.', 'error');
-            return;
-        }
-
-        showStatus('연결 테스트 중...', 'info');
         elements.testConnection.disabled = true;
+        showStatus('Anki Connect와 연결 중...', 'info');
 
         try {
-            const result = await new Promise((resolve, reject) => {
-                chrome.runtime.sendMessage({
-                    action: 'testAnkiConnection',
-                    url: url
-                }, (response) => {
-                    if (chrome.runtime.lastError) {
-                        reject(new Error(chrome.runtime.lastError.message));
-                    } else {
-                        resolve(response);
-                    }
+            const response = await new Promise((resolve, reject) => {
+                chrome.runtime.sendMessage({ action: 'testAnkiConnection', url: url }, (res) => {
+                    chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve(res);
                 });
             });
 
-            if (result.success) {
-                showStatus(`연결 성공! Anki Connect 버전: ${result.version}`, 'success');
+            if (response && response.success) {
+                showStatus(`연결 성공! Anki Connect 버전: ${response.version}`, 'success');
+                loadDeckNames(); // 연결 성공 시 덱 목록 자동 로드
             } else {
-                showStatus(result.message || '연결 실패', 'error');
+                showStatus(response ? response.message : '연결 실패', 'error');
             }
         } catch (error) {
-            showStatus('연결 테스트 중 오류가 발생했습니다: ' + error.message, 'error');
+            showStatus(`연결 테스트 오류: ${error.message}`, 'error');
         } finally {
             elements.testConnection.disabled = false;
         }
     }
 
     function saveSettings() {
-        // 입력값 유효성 검사
-        if (!validateInputs()) {
-            return;
-        }
+        if (!validateInputs()) return;
 
         const settings = {
-
             ankiConnectUrl: elements.ankiUrl.value.trim(),
-            deckName: elements.deckName.value.trim(),
+            deckName: elements.deckNameSelect.value,
             noteType: elements.noteType.value.trim(),
             fieldMapping: {
                 word: elements.fieldWord.value.trim(),
@@ -178,15 +194,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
         chrome.storage.sync.set({ drag2anki_settings: settings }, () => {
             if (chrome.runtime.lastError) {
-                showStatus('설정 저장 중 오류가 발생했습니다.', 'error');
+                showStatus(`설정 저장 실패: ${chrome.runtime.lastError.message}`, 'error');
             } else {
                 showStatus('설정이 저장되었습니다.', 'success');
-
-                // 저장 버튼 피드백
                 const originalText = elements.saveSettings.textContent;
                 elements.saveSettings.textContent = '저장됨!';
                 elements.saveSettings.classList.add('saved');
-
                 setTimeout(() => {
                     elements.saveSettings.textContent = originalText;
                     elements.saveSettings.classList.remove('saved');
@@ -197,30 +210,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function validateInputs() {
         const requiredFields = [
-            { element: elements.ankiUrl, name: 'Anki Connect URL' },
-            { element: elements.deckName, name: '덱 이름' },
-            { element: elements.noteType, name: '노트 타입' },
-            { element: elements.fieldWord, name: '단어 필드' },
-            { element: elements.fieldMeaning, name: '뜻 필드' }
+            { el: elements.ankiUrl, name: 'Anki Connect URL' },
+            { el: elements.deckNameSelect, name: '덱' },
+            { el: elements.noteType, name: '노트 타입' },
+            { el: elements.fieldWord, name: '단어 필드' },
+            { el: elements.fieldMeaning, name: '뜻 필드' }
         ];
 
         for (const field of requiredFields) {
-            if (!field.element.value.trim()) {
-                showStatus(`${field.name}을(를) 입력해주세요.`, 'error');
-                field.element.focus();
+            if (!field.el.value.trim()) {
+                showStatus(`${field.name}을(를) 선택 또는 입력해주세요.`, 'error');
+                field.el.focus();
                 return false;
             }
         }
 
-        // URL 유효성 검사
         if (!isValidUrl(elements.ankiUrl.value.trim())) {
             showStatus('유효하지 않은 Anki Connect URL입니다.', 'error');
             elements.ankiUrl.focus();
             return false;
         }
-
-
-
         return true;
     }
 
@@ -236,15 +245,12 @@ document.addEventListener('DOMContentLoaded', function() {
     function showStatus(message, type = 'info') {
         elements.connectionStatus.textContent = message;
         elements.connectionStatus.className = `status ${type}`;
-
-        // 3초 후 자동으로 숨기기
         setTimeout(() => {
             elements.connectionStatus.textContent = '';
             elements.connectionStatus.className = 'status';
         }, 3000);
     }
 
-    // 확장 프로그램 정보 표시
     const manifest = chrome.runtime.getManifest();
     const versionInfo = document.createElement('div');
     versionInfo.className = 'version-info';
