@@ -12,6 +12,9 @@ document.addEventListener('DOMContentLoaded', function() {
         resetSettings: document.getElementById('resetSettings')
     };
 
+    // 상태 메시지 자동 숨김 타이머
+    let statusHideTimer = null;
+
     // 기본 설정값
     const defaultSettings = {
         ankiConnectUrl: 'http://localhost:8765',
@@ -133,7 +136,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!validateInputs()) return;
 
         const settings = {
-            ankiConnectUrl: elements.ankiUrl.value.trim(),
             deckName: elements.deckNameSelect.value,
             darkMode: elements.darkMode.checked,
             googleSearchTranslate: elements.googleSearchTranslate.checked,
@@ -158,7 +160,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function validateInputs() {
         const requiredFields = [
-            { el: elements.ankiUrl, name: 'Anki Connect URL' },
             { el: elements.deckNameSelect, name: '덱' }
         ];
 
@@ -168,12 +169,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 field.el.focus();
                 return false;
             }
-        }
-
-        if (!isValidUrl(elements.ankiUrl.value.trim())) {
-            showStatus('유효하지 않은 Anki Connect URL입니다.', 'error');
-            elements.ankiUrl.focus();
-            return false;
         }
         return true;
     }
@@ -188,12 +183,22 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function showStatus(message, type = 'info') {
+        // 이전 타이머가 있다면 해제
+        if (statusHideTimer) {
+            clearTimeout(statusHideTimer);
+            statusHideTimer = null;
+        }
+
         elements.connectionStatus.textContent = message;
         elements.connectionStatus.className = `status ${type}`;
-        setTimeout(() => {
+
+        // 에러는 더 오래 표시 (8초), 그 외 3초
+        const duration = type === 'error' ? 8000 : 3000;
+        statusHideTimer = setTimeout(() => {
             elements.connectionStatus.textContent = '';
             elements.connectionStatus.className = 'status';
-        }, 3000);
+            statusHideTimer = null;
+        }, duration);
     }
 
     const manifest = chrome.runtime.getManifest();
