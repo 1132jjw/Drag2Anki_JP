@@ -2,18 +2,11 @@
 document.addEventListener('DOMContentLoaded', function() {
     // DOM 요소 가져오기
     const elements = {
-        ankiUrl: document.getElementById('ankiUrl'),
         deckNameSelect: document.getElementById('deckNameSelect'),
         refreshDecks: document.getElementById('refreshDecks'),
-        noteType: document.getElementById('noteType'),
-        fieldWord: document.getElementById('fieldWord'),
-        fieldMeaning: document.getElementById('fieldMeaning'),
-        fieldReading: document.getElementById('fieldReading'),
-        fieldKanji: document.getElementById('fieldKanji'),
         darkMode: document.getElementById('darkMode'),
         googleSearchTranslate: document.getElementById('googleSearchTranslate'),
         cacheEnabled: document.getElementById('cacheEnabled'),
-        testConnection: document.getElementById('testConnection'),
         connectionStatus: document.getElementById('connectionStatus'),
         saveSettings: document.getElementById('saveSettings'),
         resetSettings: document.getElementById('resetSettings')
@@ -39,20 +32,29 @@ document.addEventListener('DOMContentLoaded', function() {
     loadSettings();
     setupEventListeners();
 
-    // 덱 목록 로드 함수
+    // 연결 테스트 + 덱 목록 로드 함수
     async function loadDeckNames() {
-        showStatus('Anki 덱 목록을 불러오는 중...', 'info');
+        showStatus('Anki 연결 확인 및 덱 목록을 불러오는 중...', 'info');
         elements.deckNameSelect.disabled = true;
         elements.refreshDecks.disabled = true;
 
         try {
-            const ankiConnectUrl = elements.ankiUrl.value.trim();
-            if (!ankiConnectUrl || !isValidUrl(ankiConnectUrl)) {
-                showStatus('유효한 Anki Connect URL을 먼저 입력해주세요.', 'error');
-                elements.deckNameSelect.innerHTML = '<option value="">URL 확인 필요</option>';
+            const ankiConnectUrl = defaultSettings.ankiConnectUrl; // 고정 URL 사용
+            // 1) 연결 테스트
+            const testRes = await new Promise((resolve, reject) => {
+                chrome.runtime.sendMessage({ action: 'testAnkiConnection', url: ankiConnectUrl }, (res) => {
+                    chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve(res);
+                });
+            });
+
+            if (!testRes || !testRes.success) {
+                showStatus(testRes ? (testRes.message || '연결 실패') : '연결 실패', 'error');
+                elements.deckNameSelect.innerHTML = '<option value="">Anki 연결 확인 필요</option>';
                 return;
             }
+            showStatus(`연결 성공! Anki Connect 버전: ${testRes.version}. 덱 목록 로드 중...`, 'success');
 
+            // 2) 덱 목록 가져오기
             const deckNames = await new Promise((resolve, reject) => {
                 chrome.runtime.sendMessage({
                     type: 'GET_DECK_NAMES',
@@ -101,12 +103,6 @@ document.addEventListener('DOMContentLoaded', function() {
         chrome.storage.sync.get(['drag2anki_settings'], (result) => {
             const settings = result.drag2anki_settings || defaultSettings;
 
-            elements.ankiUrl.value = settings.ankiConnectUrl;
-            elements.noteType.value = settings.noteType;
-            elements.fieldWord.value = settings.fieldMapping.word;
-            elements.fieldMeaning.value = settings.fieldMapping.meaning;
-            elements.fieldReading.value = settings.fieldMapping.reading;
-            elements.fieldKanji.value = settings.fieldMapping.kanji;
             elements.darkMode.checked = settings.darkMode;
             elements.googleSearchTranslate.checked = settings.googleSearchTranslate;
             elements.cacheEnabled.checked = settings.cacheEnabled;
@@ -124,55 +120,14 @@ document.addEventListener('DOMContentLoaded', function() {
             document.body.classList.toggle('dark-mode', this.checked);
         });
 
-        elements.testConnection.addEventListener('click', testAnkiConnection);
         elements.saveSettings.addEventListener('click', saveSettings);
         elements.resetSettings.addEventListener('click', resetSettings);
         elements.refreshDecks.addEventListener('click', loadDeckNames);
-        elements.ankiUrl.addEventListener('blur', validateUrl);
     }
 
-    function validateUrl() {
-        const url = elements.ankiUrl.value.trim();
-        if (url && !isValidUrl(url)) {
-            showStatus('유효하지 않은 URL입니다.', 'error');
-        }
-    }
+    // 제거: URL 입력 검증 관련 로직은 더 이상 사용되지 않음
 
-    function isValidUrl(string) {
-        try {
-            new URL(string);
-            return true;
-        } catch (_) {
-            return false;
-        }
-    }
-
-    async function testAnkiConnection() {
-        const url = elements.ankiUrl.value.trim();
-        if (!validateUrl(url)) return;
-
-        elements.testConnection.disabled = true;
-        showStatus('Anki Connect와 연결 중...', 'info');
-
-        try {
-            const response = await new Promise((resolve, reject) => {
-                chrome.runtime.sendMessage({ action: 'testAnkiConnection', url: url }, (res) => {
-                    chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve(res);
-                });
-            });
-
-            if (response && response.success) {
-                showStatus(`연결 성공! Anki Connect 버전: ${response.version}`, 'success');
-                loadDeckNames(); // 연결 성공 시 덱 목록 자동 로드
-            } else {
-                showStatus(response ? response.message : '연결 실패', 'error');
-            }
-        } catch (error) {
-            showStatus(`연결 테스트 오류: ${error.message}`, 'error');
-        } finally {
-            elements.testConnection.disabled = false;
-        }
-    }
+    // testAnkiConnection은 더 이상 별도로 사용하지 않음 (새로고침 버튼에서 통합 수행)
 
     function saveSettings() {
         if (!validateInputs()) return;
@@ -180,13 +135,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const settings = {
             ankiConnectUrl: elements.ankiUrl.value.trim(),
             deckName: elements.deckNameSelect.value,
-            noteType: elements.noteType.value.trim(),
-            fieldMapping: {
-                word: elements.fieldWord.value.trim(),
-                meaning: elements.fieldMeaning.value.trim(),
-                reading: elements.fieldReading.value.trim(),
-                kanji: elements.fieldKanji.value.trim()
-            },
             darkMode: elements.darkMode.checked,
             googleSearchTranslate: elements.googleSearchTranslate.checked,
             cacheEnabled: elements.cacheEnabled.checked
@@ -211,10 +159,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function validateInputs() {
         const requiredFields = [
             { el: elements.ankiUrl, name: 'Anki Connect URL' },
-            { el: elements.deckNameSelect, name: '덱' },
-            { el: elements.noteType, name: '노트 타입' },
-            { el: elements.fieldWord, name: '단어 필드' },
-            { el: elements.fieldMeaning, name: '뜻 필드' }
+            { el: elements.deckNameSelect, name: '덱' }
         ];
 
         for (const field of requiredFields) {
