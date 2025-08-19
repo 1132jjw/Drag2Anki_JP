@@ -14,55 +14,18 @@
         </div>
 
         <div class="content">
-            <div class="section">
-                <h2>🔗 연결 설정</h2>
-
-                <div class="form-group">
-                    <label for="ankiUrl">Anki Connect URL</label>
-                    <input type="text" id="ankiUrl" placeholder="http://localhost:8765">
-                    <small>Anki Connect 애드온의 URL을 입력하세요</small>
-                </div>
-
-                <button id="testConnection" class="test-btn">연결 테스트</button>
-                <div id="connectionStatus" class="status"></div>
-            </div>
+            <!-- 연결 설정 섹션 제거: URL은 기본값 사용 -->
 
             <div class="section">
                 <h2>📋 Anki 설정</h2>
 
                 <div class="form-group">
                     <label for="deckNameSelect">덱 선택</label>
-                    <div class="deck-selector" style="display: flex; align-items: center;">
-                        <select id="deckNameSelect" style="flex-grow: 1;"></select>
-                        <button id="refreshDecks" title="덱 목록 새로고침" class="refresh-btn" style="margin-left: 8px; padding: 4px 8px; font-size: 16px; line-height: 1; border: none; background: transparent; cursor: pointer;">🔄</button>
+                    <div class="deck-selector">
+                        <select id="deckNameSelect"></select>
+                        <button id="refreshDecks" title="덱 목록 새로고침" class="refresh-btn">🔄</button>
                     </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="noteType">노트 타입</label>
-                    <input type="text" id="noteType" placeholder="Basic">
-                </div>
-
-                <div class="form-group">
-                    <label>필드 매핑</label>
-                    <div class="field-mapping">
-                        <div class="mapping-item">
-                            <span>단어</span>
-                            <input type="text" id="fieldWord" placeholder="Front">
-                        </div>
-                        <div class="mapping-item">
-                            <span>뜻</span>
-                            <input type="text" id="fieldMeaning" placeholder="Back">
-                        </div>
-                        <div class="mapping-item">
-                            <span>읽기</span>
-                            <input type="text" id="fieldReading" placeholder="Reading">
-                        </div>
-                        <div class="mapping-item">
-                            <span>한자</span>
-                            <input type="text" id="fieldKanji" placeholder="Kanji">
-                        </div>
-                    </div>
+                    <div id="connectionStatus" class="status"></div>
                 </div>
             </div>
 
