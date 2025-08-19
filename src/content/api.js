@@ -1,3 +1,8 @@
+// Disable verbose logs for production (content script isolated world)
+const __D2A_SILENCE_LOG__ = true;
+if (typeof console !== 'undefined' && __D2A_SILENCE_LOG__) {
+    console.log = function () {};
+}
 // api.js
 
 import { getHanjaInfo } from './hanja';

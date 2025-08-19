@@ -1,3 +1,8 @@
+// Disable verbose logs for production (content script isolated world)
+const __D2A_SILENCE_LOG__ = true;
+if (typeof console !== 'undefined' && __D2A_SILENCE_LOG__) {
+    console.log = function () {};
+}
 import { loadSettings } from './settings';
 import { handleTextSelection, handleKeyDown, handleDocumentClick, injectStyles } from './dom';
 import { startSearchBoxMonitor } from './googleSearch';
