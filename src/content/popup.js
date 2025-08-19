@@ -1,3 +1,8 @@
+// Disable verbose logs for production (content script isolated world)
+const __D2A_SILENCE_LOG__ = true;
+if (typeof console !== 'undefined' && __D2A_SILENCE_LOG__) {
+    console.log = function () {};
+}
 // popup.js
 
 import { loadWordInfo } from './api';
@@ -204,4 +209,91 @@ export function switchTab(tabName) {
 
     shadowRoot.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
     shadowRoot.querySelector(`#${tabName}-tab`).classList.add('active');
+}
+
+// 중복 노트 모달 표시
+export function showDuplicateModal(existing, onConfirm, onCancel) {
+    // Mount on document.body to guarantee top-most overlay
+    const root = document.body || document.documentElement;
+
+    // 이미 열려있으면 제거 후 다시 생성
+    hideDuplicateModal();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'drag2anki-dup-overlay';
+    overlay.innerHTML = `
+        <style>
+            .drag2anki-dup-overlay {
+                position: fixed;
+                inset: 0;
+                background: rgba(0,0,0,0.4);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 2147483647; /* ensure on top of any site overlays */
+            }
+            .drag2anki-dup-modal {
+                background: #fff;
+                color: #222;
+                width: 320px;
+                max-width: 90vw;
+                border-radius: 10px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+                overflow: hidden;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', Arial, sans-serif;
+            }
+            .dup-header { padding: 12px 14px; font-weight: 600; border-bottom: 1px solid #eee; }
+            .dup-body { padding: 12px 14px; line-height: 1.5; }
+            .dup-field { margin: 8px 0; }
+            .dup-label { font-size: 12px; color: #666; display: block; margin-bottom: 4px; }
+            .dup-value { background: #fafafa; border: 1px solid #eee; border-radius: 6px; padding: 8px; word-break: break-word; }
+            .dup-actions { display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid #eee; }
+            .dup-btn { flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid #ddd; background: #f5f5f5; cursor: pointer; }
+            .dup-btn.primary { background: #ef4444; color: #fff; border-color: #ef4444; }
+            .dup-btn:hover { filter: brightness(0.97); }
+        </style>
+        <div class="drag2anki-dup-modal" role="dialog" aria-modal="true">
+            <div class="dup-header">이미 저장된 항목</div>
+            <div class="dup-body">
+                <div class="dup-field">
+                    <span class="dup-label">노트 타입</span>
+                    <div class="dup-value">${existing.modelName || 'Basic'}</div>
+                </div>
+                <div class="dup-field">
+                    <span class="dup-label">Front</span>
+                    <div class="dup-value">${existing.front || ''}</div>
+                </div>
+                <div class="dup-field">
+                    <span class="dup-label">Back</span>
+                    <div class="dup-value">${existing.back || ''}</div>
+                </div>
+            </div>
+            <div class="dup-actions">
+                <button class="dup-btn" data-action="cancel">유지</button>
+                <button class="dup-btn primary" data-action="confirm">삭제하고 새로 저장</button>
+            </div>
+        </div>`;
+
+    overlay.addEventListener('click', (e) => {
+        const target = e.target;
+        if (!(target instanceof HTMLElement)) return;
+        const btn = target.closest('button');
+        if (btn) {
+            const action = btn.getAttribute('data-action');
+            if (action === 'confirm') {
+                onConfirm && onConfirm();
+            } else if (action === 'cancel') {
+                onCancel && onCancel();
+            }
+        }
+        // 배경 클릭으로 닫히지 않도록 모달 내부 클릭만 처리
+    });
+
+    root.appendChild(overlay);
+    console.log('[Drag2Anki/popup] duplicate modal overlay appended');
+}
+
+export function hideDuplicateModal() {
+    const existing = document.querySelector('.drag2anki-dup-overlay');
+    if (existing) existing.remove();
 }
