@@ -258,37 +258,77 @@ export function showSaveError(message) {
     }, 2000);
 }
 
+// Kanji save flow with duplicate handling (modal -> delete -> retry)
 export async function saveKanjiToAnki(kanji, btnEl, deckName) {
     try {
-        console.log('saveKanjiToAnki', kanji);
-        // Front 정확 일치 중복 체크 (한자는 [한자] 접미사 포함)
         const frontValue = `${kanji.kanji} [한자]`;
-        console.log('[Drag2Anki] saveKanjiToAnki frontValue:', frontValue, 'deck:', deckName);
         const isDuplicate = await checkDuplicateExact(frontValue);
-        console.log('[Drag2Anki] isDuplicate(kanji):', isDuplicate);
         if (isDuplicate) {
             try {
                 const existing = await getExistingByFront(frontValue);
-                console.log('[Drag2Anki] existing note (kanji):', existing);
                 if (existing) {
-                    // 한자 영역에는 전용 모달이 없으므로 버튼 에러만 표시
-                    return showKanjiSaveError(btnEl, '이미 저장됨');
+                    showDuplicateModal(existing, async () => {
+                        try {
+                            await deleteNotes([existing.id]);
+                            const note = createKanjiAnkiNote(kanji, deckName);
+                            const addRes = await addNoteToAnki(note);
+                            if (addRes && addRes.ok) {
+                                showKanjiSaveSuccess(btnEl);
+                            } else if (addRes && addRes.duplicate) {
+                                showKanjiSaveError(btnEl, '이미 저장됨');
+                            } else {
+                                showKanjiSaveError(btnEl, '저장 실패');
+                            }
+                        } catch (e) {
+                            showKanjiSaveError(btnEl, '삭제 실패');
+                        } finally {
+                            hideDuplicateModal();
+                        }
+                    }, () => {
+                        hideDuplicateModal();
+                        showKanjiSaveError(btnEl, '이미 저장됨');
+                    });
+                    return;
                 }
+                return showKanjiSaveError(btnEl, '이미 저장됨');
             } catch (e) {
-                console.warn('[Drag2Anki] getExistingByFront(kanji) failed:', e);
                 return showKanjiSaveError(btnEl, '이미 저장됨');
             }
         }
-        // 카드 생성
+        // No pre-check duplicate -> try add
         const note = createKanjiAnkiNote(kanji, deckName);
-        console.log('[Drag2Anki] adding kanji note:', note);
         const result = await addNoteToAnki(note);
-        console.log('[Drag2Anki] add kanji result:', result);
-        if (result) {
+        if (result && result.ok) {
             showKanjiSaveSuccess(btnEl);
-        } else {
-            showKanjiSaveError(btnEl, '저장 실패');
+            return;
         }
+        if (result && result.duplicate) {
+            const existing = result.existing || (await getExistingByFront(frontValue).catch(() => null));
+            if (existing) {
+                showDuplicateModal(existing, async () => {
+                    try {
+                        await deleteNotes([existing.id]);
+                        const retryNote = createKanjiAnkiNote(kanji, deckName);
+                        const retry = await addNoteToAnki(retryNote);
+                        if (retry && retry.ok) {
+                            showKanjiSaveSuccess(btnEl);
+                        } else {
+                            showKanjiSaveError(btnEl, '저장 실패');
+                        }
+                    } catch (e) {
+                        showKanjiSaveError(btnEl, '삭제 실패');
+                    } finally {
+                        hideDuplicateModal();
+                    }
+                }, () => {
+                    hideDuplicateModal();
+                    showKanjiSaveError(btnEl, '이미 저장됨');
+                });
+                return;
+            }
+            return showKanjiSaveError(btnEl, '이미 저장됨');
+        }
+        showKanjiSaveError(btnEl, '저장 실패');
     } catch (error) {
         showKanjiSaveError(btnEl, 'Anki 오류');
     }
