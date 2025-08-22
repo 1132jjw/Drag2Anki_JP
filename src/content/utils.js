@@ -6,9 +6,10 @@ export function isKanaOnly(text) {
     return kanaRegex.test(text);}
 
 export function isJapaneseTextOnly(text) {
-    // 일본어 문자, 괄호, 괄호 안의 일본어 허용
-    const japaneseWithParensRegex = /^[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF\(\)]+$/;
-    return japaneseWithParensRegex.test(text);
+    // 일본어 문자(히라가나, 가타카나, 한자) + 일본어 구두점/기호
+    // + 약간의 영문/숫자 허용
+    const japaneseRegex = /^[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3000-\u303F\uFF00-\uFFEF\u2010-\u2027\u203B\u2190-\u21FFA-Za-z0-9]+$/;
+    return japaneseRegex.test(text);
 }
 
 export function removeJapaneseParens(text) {
