@@ -45,9 +45,11 @@
 }
 
 .word-text {
-    font-size: 18px;
-    font-weight: 500;
+    font-size: 20px !important;
+    font-weight: 600 !important;
     font-family: 'Noto Sans JP', sans-serif;
+    margin: 0;
+    padding: 4px 0;
 }
 
 .close-btn {
@@ -170,12 +172,13 @@
 
 /* 뜻 탭 */
 .reading-text {
-    font-size: 16px;
+    font-size: 18px !important;
     font-weight: 500;
-    color: #333;
-    margin-bottom: 12px;
+    color: #2d3748;
+    margin: 12px 0;
     font-family: 'Noto Sans JP', sans-serif;
-    padding: 8px 12px;
+    padding: 10px 12px;
+    line-height: 1.6;
     background: #f5f5f5;
     border-radius: 6px;
 }
