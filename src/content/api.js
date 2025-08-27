@@ -10,6 +10,8 @@ import { safeValue, tokenize, isSingleWord } from './utils';
 import { displayWordInfo, displayError } from './popup';
 import { getKanjiFromDB, setKanjiToDB, getWordFromDB, setWordToDB } from './firebase';
 import { settings } from './settings';
+import Kuroshiro from 'kuroshiro';
+import KuromojiAnalyzer from 'kuroshiro-analyzer-kuromoji';
 
 export let currentWordInfo = null; // 전역 선언
 
@@ -94,34 +96,70 @@ export async function fetchKanjiData(text) {
 let __kuroshiroInstance = null;
 let __kuroshiroInitPromise = null;
 
-async function generateFurigana(text) {
+// Helpers to resolve API keys in browser context (prefer settings, fallback to env if bundled)
+function getOpenAIKey() {
+    const keyFromSettings = settings && settings.openaiApiKey ? settings.openaiApiKey : '';
+    if (keyFromSettings) return keyFromSettings;
     try {
-        if (!__kuroshiroInstance) {
-            const Kuroshiro = (await import('kuroshiro')).default;
-            const KuromojiAnalyzer = (await import('kuroshiro-analyzer-kuromoji')).default;
-            __kuroshiroInstance = new Kuroshiro();
-            if (!__kuroshiroInitPromise) {
-                // In browser/extension, supply dictPath for kuromoji dictionaries via CDN
-                __kuroshiroInitPromise = __kuroshiroInstance.init(new KuromojiAnalyzer({
-                    dictPath: 'https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict'
-                }));
-            }
-            await __kuroshiroInitPromise;
-        }
-        // 전체 문장도 히라가나로 변환 가능 (단어/문장 공통 처리)
-        return await __kuroshiroInstance.convert(text, { to: 'hiragana' });
-    } catch (e) {
-        console.error('Kuroshiro 초기화/변환 오류:', e);
+        // If DefinePlugin inlined the value, this will be a string; otherwise process may be undefined
+        return (typeof process !== 'undefined' && process.env && process.env.OPENAI_API_KEY) ? process.env.OPENAI_API_KEY : '';
+    } catch (_) {
         return '';
     }
 }
 
+function getDeepLKey() {
+    const keyFromSettings = settings && settings.deeplApiKey ? settings.deeplApiKey : '';
+    if (keyFromSettings) return keyFromSettings;
+    try {
+        return (typeof process !== 'undefined' && process.env && process.env.DEEPL_API_KEY) ? process.env.DEEPL_API_KEY : '';
+    } catch (_) {
+        return '';
+    }
+}
+
+async function generateFurigana(text) {
+    try {
+        if (!__kuroshiroInstance) {
+            __kuroshiroInstance = new Kuroshiro();
+            if (!__kuroshiroInitPromise) {
+                // In Chrome extension, load kuromoji dictionaries from packaged resources
+                const dictBase = (typeof chrome !== 'undefined' && chrome?.runtime?.getURL)
+                    ? chrome.runtime.getURL('dict')
+                    : '/dict';
+                __kuroshiroInitPromise = __kuroshiroInstance.init(new KuromojiAnalyzer({
+                    dictPath: dictBase
+                }));
+            }
+            await __kuroshiroInitPromise;
+        }
+        // Convert to HTML with ruby annotations (furigana)
+        return await __kuroshiroInstance.convert(text, { 
+            to: 'hiragana',
+            mode: 'furigana',
+            romajiSystem: 'hepburn',
+            delimiter_start: '<ruby>',
+            delimiter_end: '</ruby>',
+            separator: '<rt>',
+            fallback: (char, options) => {
+                // For characters that can't be converted, just return the character
+                return char;
+            }
+        });
+    } catch (e) {
+        console.error('Kuroshiro 초기화/변환 오류:', e);
+        // Return original text if conversion fails
+        return text;
+    }
+}
+
 async function callLLMForWordMeaning(text) {
+    const openaiKey = getOpenAIKey();
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+            'Authorization': `Bearer ${openaiKey}`
         },
         body: JSON.stringify({
             model: 'gpt-4.1-2025-04-14',
@@ -177,23 +215,35 @@ async function callLLMForWordMeaning(text) {
 }
 
 async function translateWithDeepL(text) {
-    const deeplResponse = await fetch('https://api-free.deepl.com/v2/translate', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Authorization': `DeepL-Auth-Key ${process.env.DEEPL_API_KEY}`
-        },
-        body: new URLSearchParams({
-            text: text,
-            target_lang: 'KO', // 한국어로 번역
-            source_lang: 'JA', // 일본어에서
-            split_sentences: '1',
-            preserve_formatting: '1'
-        }).toString()
-    });
-    const deeplData = await deeplResponse.json();
-    const translated = (deeplData && deeplData.translations && deeplData.translations[0] && deeplData.translations[0].text) ? deeplData.translations[0].text : '';
-    return translated;
+    try {
+        const res = await new Promise((resolve, reject) => {
+            try {
+                chrome.runtime.sendMessage({
+                    type: 'DEEPL_TRANSLATE',
+                    text,
+                    target_lang: 'KO',
+                    source_lang: 'JA'
+                }, (response) => {
+                    if (chrome.runtime.lastError) {
+                        return reject(new Error(chrome.runtime.lastError.message));
+                    }
+                    resolve(response);
+                });
+            } catch (err) {
+                reject(err);
+            }
+        });
+
+        if (!res || !res.success) {
+            throw new Error(res?.error || 'DeepL proxy failed');
+        }
+        const translations = res.data?.translations;
+        const translation = translations && translations[0]?.text ? translations[0].text : '';
+        return translation;
+    } catch (error) {
+        console.error('DeepL 번역 오류:', error);
+        return '';
+    }
 }
 
 export async function fetchLLMMeaning(text) {
