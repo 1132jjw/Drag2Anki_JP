@@ -6,6 +6,19 @@ if (typeof console !== 'undefined' && __D2A_SILENCE_LOG__) {
     // keep error/warn; silence regular logs
     console.log = function () {};
 }
+
+// Resolve DeepL API key from build-time env only (.env via dotenv/DefinePlugin)
+async function getDeepLKeyBg() {
+    try {
+        // Access directly so bundler can inline the value at build time.
+        // eslint-disable-next-line no-undef
+        const v = process.env.DEEPL_API_KEY;
+        return v || '';
+    } catch (_) {
+        // In case process is not defined at runtime (should be inlined by bundler)
+        return '';
+    }
+}
 chrome.runtime.onInstalled.addListener(() => {
     console.log('Drag2Anki_JP 익스텐션이 설치되었습니다.');
 
@@ -14,6 +27,7 @@ chrome.runtime.onInstalled.addListener(() => {
         if (!result.drag2anki_settings) {
             const defaultSettings = {
                 openaiApiKey: '',
+                deeplApiKey: '',
                 ankiConnectUrl: 'http://localhost:8765',
                 deckName: 'Japanese',
                 noteType: 'Basic',
@@ -27,6 +41,13 @@ chrome.runtime.onInstalled.addListener(() => {
             };
 
             chrome.storage.sync.set({ drag2anki_settings: defaultSettings });
+        } else {
+            // 마이그레이션: 기존 사용자 설정에 deeplApiKey가 없으면 추가
+            const current = result.drag2anki_settings || {};
+            if (typeof current.deeplApiKey === 'undefined') {
+                current.deeplApiKey = '';
+                chrome.storage.sync.set({ drag2anki_settings: current });
+            }
         }
     });
 });
@@ -99,6 +120,45 @@ async function testAnkiConnection(url) {
 
 // Anki 카드 중복 확인 요청 처리
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.type === 'DEEPL_TRANSLATE') {
+        (async () => {
+            try {
+                const text = request.text || '';
+                const target_lang = request.target_lang || 'KO';
+                const source_lang = request.source_lang || 'JA';
+                const key = request.key || await getDeepLKeyBg();
+                if (!key) {
+                    throw new Error('DeepL API 키가 설정되지 않았습니다. .env에 DEEPL_API_KEY를 설정하고 다시 빌드하세요.');
+                }
+
+                const res = await fetch('https://api-free.deepl.com/v2/translate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Authorization': `DeepL-Auth-Key ${key}`
+                    },
+                    body: new URLSearchParams({
+                        text,
+                        target_lang,
+                        source_lang,
+                        split_sentences: '1',
+                        preserve_formatting: '1'
+                    }).toString()
+                });
+
+                if (!res.ok) {
+                    const msg = `DeepL HTTP ${res.status}: ${res.statusText}`;
+                    throw new Error(msg);
+                }
+                const data = await res.json();
+                sendResponse({ success: true, data });
+            } catch (error) {
+                console.error('[Drag2Anki/bg] DEEPL_TRANSLATE error:', error);
+                sendResponse({ success: false, error: error.message });
+            }
+        })();
+        return true; // async response
+    }
     if (request.type === 'CHECK_DUPLICATE') {
         fetch(request.ankiConnectUrl, {
             method: 'POST',

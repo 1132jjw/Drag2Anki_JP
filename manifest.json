@@ -15,7 +15,8 @@
     "https://jisho.org/*",
     "https://api.openai.com/*",
     "https://kanjiapi.dev/*",
-    "https://www.google.com/*"
+    "https://www.google.com/*",
+    "https://api-free.deepl.com/*"
   ],
   "content_scripts": [
     {

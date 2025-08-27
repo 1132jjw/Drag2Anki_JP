@@ -1,3 +1,19 @@
+/* global __webpack_public_path__ */
+// Ensure async chunks load from extension URL, not the page origin
+try {
+    if (typeof chrome !== 'undefined' && chrome?.runtime?.getURL) {
+        // e.g., chrome-extension://<id>/
+        __webpack_public_path__ = chrome.runtime.getURL('');
+    }
+} catch (e) {
+    // ignore
+}
+
+// Minimal process shim for browser (some deps reference process)
+if (typeof window !== 'undefined' && typeof window.process === 'undefined') {
+    window.process = { env: {} };
+}
+
 // Disable verbose logs for production (content script isolated world)
 const __D2A_SILENCE_LOG__ = true;
 if (typeof console !== 'undefined' && __D2A_SILENCE_LOG__) {
