@@ -6,7 +6,8 @@ document.addEventListener('DOMContentLoaded', function() {
         refreshDecks: document.getElementById('refreshDecks'),
         darkMode: document.getElementById('darkMode'),
         googleSearchTranslate: document.getElementById('googleSearchTranslate'),
-        cacheEnabled: document.getElementById('cacheEnabled'),
+        // Cache is now always enabled
+        cacheEnabled: { checked: true },
         connectionStatus: document.getElementById('connectionStatus'),
         saveSettings: document.getElementById('saveSettings'),
         resetSettings: document.getElementById('resetSettings')
@@ -28,7 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         darkMode: false,
         googleSearchTranslate: false,
-        cacheEnabled: true
+        cacheEnabled: true // Always enabled
     };
 
     // 설정 로드 및 UI 초기화
