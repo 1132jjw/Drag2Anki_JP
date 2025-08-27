@@ -66,7 +66,7 @@ export function createPopup(text, rect) {
             </div>
         </div>
         <div class="popup-footer">
-            <button class="save-btn">Anki에 저장 [단어]</button>
+            <button class="save-btn">Anki에 저장</button>
         </div>
     `;
 
