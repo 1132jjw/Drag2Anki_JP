@@ -105,8 +105,35 @@ export async function fetchLLMMeaning(text) {
             console.error(`Firebase DB 조회 오류 (${text}):`, error);
         }
     } else {
-        // 추후 여기에 직접 만든 API를 사용하여 정보를 가져오도록 수정
-        console.log(`단어가 여러 개: ${text}`);
+        // 문장(단어가 아님)인 경우 DeepL API로 번역 처리
+        console.log(`문장 번역(DeepL) 시도: ${text}`);
+        try {
+            const deeplResponse = await fetch('https://api-free.deepl.com/v2/translate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Authorization': `DeepL-Auth-Key ${process.env.DEEPL_API_KEY}`
+                },
+                body: new URLSearchParams({
+                    text: text,
+                    target_lang: 'KO', // 한국어로 번역
+                    source_lang: 'JA', // 일본어에서
+                    split_sentences: '1',
+                    preserve_formatting: '1'
+                }).toString()
+            });
+            const deeplData = await deeplResponse.json();
+            const translated = (deeplData && deeplData.translations && deeplData.translations[0] && deeplData.translations[0].text) ? deeplData.translations[0].text : '';
+            if (translated) {
+                return {
+                    reading: '',
+                    meaning: translated
+                };
+            }
+        } catch (deeplError) {
+            console.error('DeepL 번역 오류:', deeplError);
+            // 실패 시 아래의 GPT 흐름으로 폴백
+        }
     }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
