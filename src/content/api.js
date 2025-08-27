@@ -90,52 +90,33 @@ export async function fetchKanjiData(text) {
     return kanjiData;
 }
 
-export async function fetchLLMMeaning(text) {
-    const tokens = await tokenize(text);
-    const isWord = isSingleWord(tokens);
+// ----- Helpers: Furigana, LLM (word), DeepL (sentence) -----
+let __kuroshiroInstance = null;
+let __kuroshiroInitPromise = null;
 
-    if (isWord) {
-        try {
-            const dbData = await getWordFromDB(text);
-            if (dbData) {
-                console.log(`Firebase DB에서 단어 정보 찾음: ${text}`);
-                return dbData;
+async function generateFurigana(text) {
+    try {
+        if (!__kuroshiroInstance) {
+            const Kuroshiro = (await import('kuroshiro')).default;
+            const KuromojiAnalyzer = (await import('kuroshiro-analyzer-kuromoji')).default;
+            __kuroshiroInstance = new Kuroshiro();
+            if (!__kuroshiroInitPromise) {
+                // In browser/extension, supply dictPath for kuromoji dictionaries via CDN
+                __kuroshiroInitPromise = __kuroshiroInstance.init(new KuromojiAnalyzer({
+                    dictPath: 'https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict'
+                }));
             }
-        } catch (error) {
-            console.error(`Firebase DB 조회 오류 (${text}):`, error);
+            await __kuroshiroInitPromise;
         }
-    } else {
-        // 문장(단어가 아님)인 경우 DeepL API로 번역 처리
-        console.log(`문장 번역(DeepL) 시도: ${text}`);
-        try {
-            const deeplResponse = await fetch('https://api-free.deepl.com/v2/translate', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'Authorization': `DeepL-Auth-Key ${process.env.DEEPL_API_KEY}`
-                },
-                body: new URLSearchParams({
-                    text: text,
-                    target_lang: 'KO', // 한국어로 번역
-                    source_lang: 'JA', // 일본어에서
-                    split_sentences: '1',
-                    preserve_formatting: '1'
-                }).toString()
-            });
-            const deeplData = await deeplResponse.json();
-            const translated = (deeplData && deeplData.translations && deeplData.translations[0] && deeplData.translations[0].text) ? deeplData.translations[0].text : '';
-            if (translated) {
-                return {
-                    reading: '',
-                    meaning: translated
-                };
-            }
-        } catch (deeplError) {
-            console.error('DeepL 번역 오류:', deeplError);
-            // 실패 시 아래의 GPT 흐름으로 폴백
-        }
+        // 전체 문장도 히라가나로 변환 가능 (단어/문장 공통 처리)
+        return await __kuroshiroInstance.convert(text, { to: 'hiragana' });
+    } catch (e) {
+        console.error('Kuroshiro 초기화/변환 오류:', e);
+        return '';
     }
+}
 
+async function callLLMForWordMeaning(text) {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -150,17 +131,15 @@ export async function fetchLLMMeaning(text) {
                     content: `
                     [응답 형식]
 
-                    - 단어를 읽을 수 있는 후리가나 방식이 여러 개가 있다면 여러 개 모두 반환
                     - 가능한 한 전체 응답이 200 토큰을 넘지 않도록 간결하게 작성
-                    - 너무 상세하지 않게  기존의 사전과 비슷한 정보량을 전달하기
+                    - 너무 상세하지 않게 기존의 사전과 비슷한 정보량을 전달하기
 
                     [출력 포맷 예시]
 
-                    후리가나: [단어의 후리가나]
                     뜻:
                     [품사]
-                        1.	[의미1]
-                        2.	[의미2]
+                        1.\t[의미1]
+                        2.\t[의미2]
                     …
 
                     ⸻
@@ -168,14 +147,13 @@ export async function fetchLLMMeaning(text) {
                     [예시]
                     입력: 偶然
                     출력:
-                    후리가나: ぐうぜん
                     뜻:
                     명사
-                        1.	우연
-                        2.	(철학) ((contingency)) 우연성; 어떤 사물이 인과율에 근거하지 않는 성질
+                        1.\t우연
+                        2.\t(철학) ((contingency)) 우연성; 어떤 사물이 인과율에 근거하지 않는 성질
 
                     부사
-                        1.	뜻하지 않게; 우연히
+                        1.\t뜻하지 않게; 우연히
 
                     ⸻
 
@@ -192,28 +170,89 @@ export async function fetchLLMMeaning(text) {
     });
 
     const data = await response.json();
-    const content = data.choices[0].message.content;
-    
-    // 후리가나와 뜻을 분리하여 객체로 반환
-    const readingMatch = content.match(/후리가나:\s*(.+)/);
+    const content = data?.choices?.[0]?.message?.content || '';
     const meaningMatch = content.match(/뜻:\s*([\s\S]*)/);
-    const reading = readingMatch ? readingMatch[1].trim() : '';
     const meaning = meaningMatch ? meaningMatch[1].trim() : content;
+    return meaning;
+}
 
-    // 단어일 경우 DB에 저장
+async function translateWithDeepL(text) {
+    const deeplResponse = await fetch('https://api-free.deepl.com/v2/translate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': `DeepL-Auth-Key ${process.env.DEEPL_API_KEY}`
+        },
+        body: new URLSearchParams({
+            text: text,
+            target_lang: 'KO', // 한국어로 번역
+            source_lang: 'JA', // 일본어에서
+            split_sentences: '1',
+            preserve_formatting: '1'
+        }).toString()
+    });
+    const deeplData = await deeplResponse.json();
+    const translated = (deeplData && deeplData.translations && deeplData.translations[0] && deeplData.translations[0].text) ? deeplData.translations[0].text : '';
+    return translated;
+}
+
+export async function fetchLLMMeaning(text) {
+    const tokens = await tokenize(text);
+    const isWord = isSingleWord(tokens);
+
+    // 1) 항상 먼저 후리가나 생성
+    const reading = await generateFurigana(text);
+
+    // 2) 분기: 단어 vs 문장
     if (isWord) {
+        // 2-1) 캐시(DB) 먼저 확인
+        try {
+            const dbData = await getWordFromDB(text);
+            if (dbData) {
+                console.log(`Firebase DB에서 단어 정보 찾음: ${text}`);
+                // DB의 reading이 없다면 이번에 생성한 reading을 보강해서 반환
+                return { reading: dbData.reading || reading, meaning: dbData.meaning };
+            }
+        } catch (error) {
+            console.error(`Firebase DB 조회 오류 (${text}):`, error);
+        }
+
+        // 2-2) LLM에서 뜻 받아오기
+        let meaning = '';
+        try {
+            meaning = await callLLMForWordMeaning(text);
+        } catch (e) {
+            console.error('LLM 의미 조회 오류:', e);
+            meaning = '';
+        }
+
+        // 2-3) DB 저장 (reading은 Kuroshiro 결과 사용)
         try {
             await setWordToDB(text, { reading: reading, meaning: meaning });
             console.log(`Firebase DB에 단어 정보 저장: ${text}`);
         } catch (error) {
             console.error(`Firebase DB 저장 오류 (${text}):`, error);
         }
-    }
 
-    return {
-        reading: reading,
-        meaning: meaning
-    };
+        return { reading: reading, meaning: meaning };
+    } else {
+        // 문장: DeepL 번역 우선, 실패 시 LLM 폴백
+        console.log(`문장 번역(DeepL) 시도: ${text}`);
+        let meaning = '';
+        try {
+            meaning = await translateWithDeepL(text);
+        } catch (deeplError) {
+            console.error('DeepL 번역 오류:', deeplError);
+        }
+        if (!meaning) {
+            try {
+                meaning = await callLLMForWordMeaning(text);
+            } catch (e) {
+                console.error('LLM 폴백 오류:', e);
+            }
+        }
+        return { reading: reading, meaning: meaning };
+    }
 }
 
 export async function loadWordInfo(text) {
