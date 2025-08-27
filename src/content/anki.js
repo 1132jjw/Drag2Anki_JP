@@ -84,8 +84,8 @@ export async function saveToAnki(text, deckName) {
         const wordInfo = currentWordInfo; // wordInfo 직접 사용
         console.log('저장할 단어 정보:', wordInfo);
 
-        // Front 정확 일치 중복 체크 (단어는 [단어] 접미사 포함)
-        const frontValue = `${text} [단어]`;
+        // Front 정확 일치 중복 체크
+        const frontValue = text;
         console.log('[Drag2Anki] saveToAnki frontValue:', frontValue, 'deck:', deckName);
         const isDuplicate = await checkDuplicateExact(frontValue);
         console.log('[Drag2Anki] isDuplicate(word):', isDuplicate);
@@ -131,7 +131,7 @@ export async function saveToAnki(text, deckName) {
         } else if (addRes && addRes.duplicate) {
             // 사전 중복 체크가 놓친 경우: 배경이 중복 반환 → 모달 띄워서 처리
             try {
-                const frontValue = `${text} [단어]`;
+                const frontValue = text;
                 const existing = addRes.existing || await getExistingByFront(frontValue);
                 console.log('[Drag2Anki] existing from add duplicate (word):', existing);
                 if (existing) {
@@ -194,7 +194,7 @@ export function createAnkiNote(text, wordInfo, deckName) {
         meaning = reading + '\n\n' + meaning;
     }
     
-    fields[settings.fieldMapping.word] = text + ' [단어]';
+    fields[settings.fieldMapping.word] = text;
     fields[settings.fieldMapping.meaning] = meaning.replace(/\n/g, '<br>');
 
     return {
@@ -234,7 +234,7 @@ export function showSaveSuccess() {
     if (!saveBtn) return;
 
     const originalText = saveBtn.textContent;
-    saveBtn.textContent = '저장됨! [단어]';
+    saveBtn.textContent = '저장됨!';
     saveBtn.style.backgroundColor = '#4CAF50';
 
     setTimeout(() => {
@@ -249,7 +249,7 @@ export function showSaveError(message) {
     if (!saveBtn) return;
 
     const originalText = saveBtn.textContent;
-    saveBtn.textContent = (message || '저장 실패') + ' [단어]';
+    saveBtn.textContent = message || '저장 실패';
     saveBtn.style.backgroundColor = '#f44336';
 
     setTimeout(() => {
