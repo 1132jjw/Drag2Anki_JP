@@ -7,10 +7,13 @@ export function isKanaOnly(text) {
 
 export function isJapaneseTextOnly(text) {
     // 허용 문자 집합: 일본어 문자(히라가나, 가타카나, 한자) + 일본어 구두점/기호 + 일부 영문/숫자
-    const allowedCharsRegex = /^[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3000-\u303F\uFF00-\uFFEF\u2010-\u2027\u203B\u2190-\u21FFA-Za-z0-9]+$/;
+    // const allowedCharsRegex = /^[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3000-\u303F\uFF00-\uFFEF\u2010-\u2027\u203B\u2190-\u21FFA-Za-z0-9]+$/;
+    
+    // 한국어(가-힣, ㄱ-ㅎ, ㅏ-ㅣ)가 포함되면 false
+    const hasKoreanRegex = /[\uAC00-\uD7A3\u1100-\u11FF\u3130-\u318F]/;
     // 최소 한 글자 이상의 일본어(히라가나/가타카나/한자)가 포함되어야 함
     const hasJapaneseRegex = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/;
-    return hasJapaneseRegex.test(text) && allowedCharsRegex.test(text);
+    return hasJapaneseRegex.test(text) && !hasKoreanRegex.test(text);
 }
 
 export function removeJapaneseParens(text) {
