@@ -20,7 +20,7 @@ async function getDeepLKeyBg() {
     }
 }
 chrome.runtime.onInstalled.addListener(() => {
-    console.log('Drag2Anki_JP 익스텐션이 설치되었습니다.');
+    // console.log('Drag2Anki_JP 익스텐션이 설치되었습니다.');
 
     // 기본 설정 초기화
     chrome.storage.sync.get(['drag2anki_settings'], (result) => {
@@ -196,7 +196,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                         }
                         console.log('[Drag2Anki/bg] model first field:', modelName, '->', primaryField);
                     } catch (e) {
-                        console.warn('[Drag2Anki/bg] modelFieldNames failed, fallback to request.fieldName:', e);
+                        // console.warn('[Drag2Anki/bg] modelFieldNames failed, fallback to request.fieldName:', e);
                     }
                 }
                 // 쿼리: 노트 타입 + 첫 필드 정확 일치 제한
@@ -211,22 +211,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     })
                 });
                 const findData = await findRes.json();
-                console.log('[Drag2Anki/bg] CHECK_DUPLICATE_EXACT query:', broadQuery, 'primaryField:', primaryField);
-                console.log('[Drag2Anki/bg] findNotes result ids:', findData?.result);
+                // console.log('[Drag2Anki/bg] CHECK_DUPLICATE_EXACT query:', broadQuery, 'primaryField:', primaryField);
+                // console.log('[Drag2Anki/bg] findNotes result ids:', findData?.result);
                 let ids = findData.result;
                 // Fallback: if no ids with field-scoped query, try broad query note+text only
                 if (!ids || ids.length === 0) {
                     const fallbackQuery = (modelName ? `note:"${modelName}" ` : '') + `"${text}"`;
-                    console.log('[Drag2Anki/bg] no ids, fallback query:', fallbackQuery);
+                    // console.log('[Drag2Anki/bg] no ids, fallback query:', fallbackQuery);
                     const fbRes = await fetch(request.ankiConnectUrl, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ action: 'findNotes', version: 6, params: { query: fallbackQuery } })
                     });
                     const fbData = await fbRes.json();
-                    console.log('[Drag2Anki/bg] fallback ids:', fbData?.result);
+                    // console.log('[Drag2Anki/bg] fallback ids:', fbData?.result);
                     ids = fbData.result || [];
                     if (!ids.length) {
-                        console.log('[Drag2Anki/bg] duplicate: false (no ids even after fallback)');
+                        // console.log('[Drag2Anki/bg] duplicate: false (no ids even after fallback)');
                         sendResponse({ success: true, isDuplicate: false });
                         return;
                     }
@@ -242,7 +242,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     })
                 });
                 const infoData = await infoRes.json();
-                console.log('[Drag2Anki/bg] notesInfo count:', infoData?.result?.length);
+                // console.log('[Drag2Anki/bg] notesInfo count:', infoData?.result?.length);
                 const isDuplicate = infoData.result.some(note => {
                     const fieldKeys = Object.keys(note.fields || {});
                     const resolvedKey = fieldKeys.find(k => k.toLowerCase() === (primaryField || '').toLowerCase()) || primaryField;
@@ -251,20 +251,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     const target = (text || '').trim();
                     const match = plain === target;
                     if (match) {
-                        console.log('[Drag2Anki/bg] duplicate match on note', note.noteId || note.id, { plain, target });
+                        // console.log('[Drag2Anki/bg] duplicate match on note', note.noteId || note.id, { plain, target });
                     } else {
-                        console.log('[Drag2Anki/bg] not match', {
-                            plain,
-                            target,
-                            plainLen: plain.length,
-                            targetLen: target.length,
-                            model: note.modelName,
-                            field: resolvedKey
-                        });
+                        // console.log('[Drag2Anki/bg] not match', {
+                        //     plain,
+                        //     target,
+                        //     plainLen: plain.length,
+                        //     targetLen: target.length,
+                        //     model: note.modelName,
+                        //     field: resolvedKey
+                        // });
                     }
                     return match;
                 });
-                console.log('[Drag2Anki/bg] duplicate computed:', isDuplicate);
+                // console.log('[Drag2Anki/bg] duplicate computed:', isDuplicate);
                 sendResponse({ success: true, isDuplicate });
             } catch (error) {
                 console.error('[Drag2Anki/bg] CHECK_DUPLICATE_EXACT error:', error);
@@ -274,7 +274,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
     else if (request.type === 'ADD_TO_ANKI') {
-        console.log('[Drag2Anki/bg] ADD_TO_ANKI start');
+        // console.log('[Drag2Anki/bg] ADD_TO_ANKI start');
         fetch(request.ankiConnectUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -286,7 +286,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         })
         .then(res => res.json())
         .then(data => {
-            console.log('[Drag2Anki/bg] ADD_TO_ANKI result:', data);
+            // console.log('[Drag2Anki/bg] ADD_TO_ANKI result:', data);
             if (data && data.error) {
                 // Duplicate or other error from Anki
                 const errMsg = String(data.error || 'Unknown error');
@@ -349,7 +349,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         (async () => {
             try {
                 const modelName = request.modelName;
-                console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT start', { fieldName: request.fieldName, modelName: modelName, text: request.text });
+                // console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT start', { fieldName: request.fieldName, modelName: modelName, text: request.text });
                 // Broad query with model + primary field equality to capture the right note
                 const text = request.text.trim();
                 // 모델의 첫 필드명 조회 (없으면 요청 필드명 사용)
@@ -368,7 +368,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                         }
                         console.log('[Drag2Anki/bg] model first field:', modelName, '->', primaryField);
                     } catch (e) {
-                        console.warn('[Drag2Anki/bg] modelFieldNames failed, fallback to request.fieldName:', e);
+                        // console.warn('[Drag2Anki/bg] modelFieldNames failed, fallback to request.fieldName:', e);
                     }
                 }
                 const query = (modelName ? `note:"${modelName}" ` : '') + `field:${primaryField}:"${text}"`;
@@ -379,23 +379,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     body: JSON.stringify({ action: 'findNotes', version: 6, params: { query } })
                 });
                 const findData = await findRes.json();
-                console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT query:', query, 'primaryField:', primaryField);
-                console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT ids:', findData?.result);
+                // console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT query:', query, 'primaryField:', primaryField);
+                // console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT ids:', findData?.result);
                 let ids = findData.result || [];
                 // Fallback to broad query if none
                 if (!ids.length) {
                     const fallbackQuery = (modelName ? `note:"${modelName}" ` : '') + `"${text}"`;
-                    console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT no ids, fallback query:', fallbackQuery);
+                    // console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT no ids, fallback query:', fallbackQuery);
                     const fbRes = await fetch(request.ankiConnectUrl, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ action: 'findNotes', version: 6, params: { query: fallbackQuery } })
                     });
                     const fbData = await fbRes.json();
-                    console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT fallback ids:', fbData?.result);
+                    // console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT fallback ids:', fbData?.result);
                     ids = fbData.result || [];
                 }
                 if (ids.length === 0) {
-                    console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT no result');
+                    // console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT no result');
                     sendResponse({ success: true, result: null });
                     return;
                 }
@@ -417,7 +417,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 });
                 const note = matched || (infoData.result && infoData.result[0]) || null;
                 if (!note) {
-                    console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT notesInfo empty');
+                    // console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT notesInfo empty');
                     sendResponse({ success: true, result: null });
                     return;
                 }
@@ -429,7 +429,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 const backResolved = fieldKeys.find(k => k.toLowerCase() === (backKey || '').toLowerCase()) || backKey;
                 const front = note.fields?.[resolvedKey]?.value || '';
                 const back = note.fields?.[backResolved]?.value || '';
-                console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT note:', { id: note.noteId || note.id || ids[0], modelName: note.modelName, front, back });
+                // console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT note:', { id: note.noteId || note.id || ids[0], modelName: note.modelName, front, back });
                 sendResponse({
                     success: true,
                     result: {
@@ -448,7 +448,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     else if (request.type === 'DELETE_NOTES') {
         // 지정된 노트 ID들 삭제
-        console.log('[Drag2Anki/bg] DELETE_NOTES start', { noteIds: request.noteIds });
+        // console.log('[Drag2Anki/bg] DELETE_NOTES start', { noteIds: request.noteIds });
         fetch(request.ankiConnectUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -535,7 +535,7 @@ function showNotification(title, message, type = 'basic') {
 // 설정 변경 감지 및 동기화
 chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'sync' && changes.drag2anki_settings) {
-        console.log('설정이 변경되었습니다:', changes.drag2anki_settings.newValue);
+        // console.log('설정이 변경되었습니다:', changes.drag2anki_settings.newValue);
 
         // 모든 탭에 설정 변경 알림
         chrome.tabs.query({}, (tabs) => {
@@ -577,7 +577,7 @@ chrome.runtime.onSuspend.addListener(() => {
     // 필요한 정리 작업 수행
 });
 
-// 오류 처리
-chrome.runtime.onInstalled.addListener(() => {
-    chrome.runtime.setUninstallURL('https://forms.gle/feedback');
-});
+// 익스텐션 제거 시 평가
+// chrome.runtime.onInstalled.addListener(() => {
+//     chrome.runtime.setUninstallURL('https://forms.gle/feedback');
+// });
