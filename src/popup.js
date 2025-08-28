@@ -136,14 +136,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // testAnkiConnection은 더 이상 별도로 사용하지 않음 (새로고침 버튼에서 통합 수행)
 
     function saveSettings() {
-        if (!validateInputs()) return;
-
         const settings = {
-            deckName: elements.deckNameSelect.value,
             darkMode: elements.darkMode.checked,
             googleSearchTranslate: elements.googleSearchTranslate.checked,
             cacheEnabled: elements.cacheEnabled.checked
         };
+
+        if (elements.deckNameSelect.value && elements.deckNameSelect.value.trim() !== "") {
+            settings.deckName = elements.deckNameSelect.value;
+        }
 
         chrome.storage.sync.set({ drag2anki_settings: settings }, () => {
             if (chrome.runtime.lastError) {
@@ -159,21 +160,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }, 2000);
             }
         });
-    }
-
-    function validateInputs() {
-        const requiredFields = [
-            { el: elements.deckNameSelect, name: '덱' }
-        ];
-
-        for (const field of requiredFields) {
-            if (!field.el.value.trim()) {
-                showStatus(`${field.name}을(를) 선택 또는 입력해주세요.`, 'error');
-                field.el.focus();
-                return false;
-            }
-        }
-        return true;
     }
 
     function resetSettings() {
