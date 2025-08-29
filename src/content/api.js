@@ -20,7 +20,7 @@ let cache = new Map();
 let CACHE_DURATION = 24 * 60 * 60 * 1000; // 24시간
 
 export async function fetchJishoData(text) {
-    const response = await fetch(`https://drag2ankijpproxy-production.up.railway.app/jisho?word=${encodeURIComponent(text)}`);
+    const response = await fetch(`${PROXY_BASE_URL}/jisho?word=${encodeURIComponent(text)}`);
     const data = await response.json();
     return data.data[0] || null;
 }
@@ -96,27 +96,9 @@ export async function fetchKanjiData(text) {
 let __kuroshiroInstance = null;
 let __kuroshiroInitPromise = null;
 
-// Helpers to resolve API keys in browser context (prefer settings, fallback to env if bundled)
-function getOpenAIKey() {
-    const keyFromSettings = settings && settings.openaiApiKey ? settings.openaiApiKey : '';
-    if (keyFromSettings) return keyFromSettings;
-    try {
-        // If DefinePlugin inlined the value, this will be a string; otherwise process may be undefined
-        return (typeof process !== 'undefined' && process.env && process.env.OPENAI_API_KEY) ? process.env.OPENAI_API_KEY : '';
-    } catch (_) {
-        return '';
-    }
-}
-
-function getDeepLKey() {
-    const keyFromSettings = settings && settings.deeplApiKey ? settings.deeplApiKey : '';
-    if (keyFromSettings) return keyFromSettings;
-    try {
-        return (typeof process !== 'undefined' && process.env && process.env.DEEPL_API_KEY) ? process.env.DEEPL_API_KEY : '';
-    } catch (_) {
-        return '';
-    }
-}
+// Proxy server configuration
+const PROXY_BASE_URL = 'https://drag2ankijpproxy-production.up.railway.app';
+// For local development, use: 'http://localhost:3001'
 
 async function generateFurigana(text) {
     try {
@@ -154,56 +136,21 @@ async function generateFurigana(text) {
 }
 
 async function callLLMForWordMeaning(text) {
-    const openaiKey = getOpenAIKey();
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch(`${PROXY_BASE_URL}/openai/chat`, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${openaiKey}`
+            'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            model: 'gpt-4.1-2025-04-14',
+            model: 'gpt-4-1106-preview',
             messages: [
-                {
-                    role: 'system',
-                    content: `
-                    [응답 형식]
-
-                    - 가능한 한 전체 응답이 200 토큰을 넘지 않도록 간결하게 작성
-                    - 너무 상세하지 않게 기존의 사전과 비슷한 정보량을 전달하기
-
-                    [출력 포맷 예시]
-
-                    뜻:
-                    [품사]
-                        1.\t[의미1]
-                        2.\t[의미2]
-                    …
-
-                    ⸻
-
-                    [예시]
-                    입력: 偶然
-                    출력:
-                    뜻:
-                    명사
-                        1.\t우연
-                        2.\t(철학) ((contingency)) 우연성; 어떤 사물이 인과율에 근거하지 않는 성질
-
-                    부사
-                        1.\t뜻하지 않게; 우연히
-
-                    ⸻
-
-                    입력받은 일본어 단어마다 위 형식에 맞춰 답변해 주세요.
-                    `,
-                },
                 {
                     role: 'user',
                     content: text
                 }
             ],
-            max_tokens: 200
+            max_tokens: 200,
+            prompt_type: 'word_meaning'
         })
     });
 
@@ -216,24 +163,20 @@ async function callLLMForWordMeaning(text) {
 
 async function translateWithDeepL(text) {
     try {
-        const res = await new Promise((resolve, reject) => {
-            try {
-                chrome.runtime.sendMessage({
-                    type: 'DEEPL_TRANSLATE',
-                    text,
-                    target_lang: 'KO',
-                    source_lang: 'JA'
-                }, (response) => {
-                    if (chrome.runtime.lastError) {
-                        return reject(new Error(chrome.runtime.lastError.message));
-                    }
-                    resolve(response);
-                });
-            } catch (err) {
-                reject(err);
-            }
+        const response = await fetch(`${PROXY_BASE_URL}/deepl/translate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                text: text,
+                target_lang: 'KO',
+                source_lang: 'JA'
+            })
         });
 
+        const res = await response.json();
+        
         if (!res || !res.success) {
             throw new Error(res?.error || 'DeepL proxy failed');
         }
