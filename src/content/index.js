@@ -22,17 +22,17 @@ if (typeof console !== 'undefined' && __D2A_SILENCE_LOG__) {
 import { loadSettings } from './settings';
 import { handleTextSelection, handleKeyDown, handleDocumentClick, injectStyles } from './dom';
 import { startSearchBoxMonitor } from './googleSearch';
-import { initializeFirebase } from './firebaseConfig';
+import { testDBConnection } from './firebaseProxy';
 
 async function init() {
     const settings = await loadSettings();
     
-    // Firebase 초기화 (비동기로 실행, 실패해도 다른 기능에 영향 없음)
+    // DB 연결 테스트 (proxy를 통해, 비동기로 실행, 실패해도 다른 기능에 영향 없음)
     try {
-        await initializeFirebase();
-        console.log('Firebase 초기화 완료');
+        await testDBConnection();
+        console.log('DB 연결 테스트 완료 (via proxy)');
     } catch (error) {
-        console.warn('Firebase 초기화 실패 (DB 기능 비활성화):', error);
+        console.warn('DB 연결 테스트 실패 (DB 기능 비활성화):', error);
     }
     
     document.addEventListener('mouseup', handleTextSelection);

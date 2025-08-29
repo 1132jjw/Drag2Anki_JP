@@ -12,11 +12,10 @@
   ],
   "host_permissions": [
     "http://localhost:8765/*",
-    "https://jisho.org/*",
-    "https://api.openai.com/*",
+    "http://localhost:3001/*",
+    "https://drag2ankijpproxy-production.up.railway.app/*",
     "https://kanjiapi.dev/*",
-    "https://www.google.com/*",
-    "https://api-free.deepl.com/*"
+    "https://www.google.com/*"
   ],
   "content_scripts": [
     {
