@@ -107,10 +107,39 @@ async function testAnkiConnection(url) {
     }
 }
 
+// Proxy server configuration
+const PROXY_BASE_URL = 'https://drag2ankijpproxy-production.up.railway.app';
+
 // Anki 카드 중복 확인 요청 처리
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    // Proxy API requests to avoid CORS issues
+    if (request.type === 'PROXY_DEEPL') {
+        const { text, sourceLanguage } = request;
+        const endpoint = sourceLanguage === 'EN' ? '/deepl/translate-english' : '/deepl/translate';
+        fetch(`${PROXY_BASE_URL}${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+        })
+        .then(response => response.json())
+        .then(data => sendResponse({ success: true, result: data }))
+        .catch(error => sendResponse({ success: false, error: error.message }));
+        return true;
+    }
+    else if (request.type === 'PROXY_OPENAI') {
+        const { prompt_type, messages } = request;
+        fetch(`${PROXY_BASE_URL}/openai/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt_type, messages })
+        })
+        .then(response => response.json())
+        .then(data => sendResponse({ success: true, result: data }))
+        .catch(error => sendResponse({ success: false, error: error.message }));
+        return true;
+    }
     // DeepL_TRANSLATE handler removed - now using proxy server directly from content script
-    if (request.type === 'CHECK_DUPLICATE') {
+    else if (request.type === 'CHECK_DUPLICATE') {
         fetch(request.ankiConnectUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

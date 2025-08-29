@@ -19,11 +19,6 @@ export let currentWordInfo = null; // 전역 선언
 let cache = new Map();
 let CACHE_DURATION = 24 * 60 * 60 * 1000; // 24시간
 
-export async function fetchJishoData(text) {
-    const response = await fetch(`${PROXY_BASE_URL}/jisho?word=${encodeURIComponent(text)}`);
-    const data = await response.json();
-    return data.data[0] || null;
-}
 
 export async function fetchKanjiData(text) {
     const kanjiList = text.match(/[\u4E00-\u9FAF]/g) || [];
@@ -97,7 +92,8 @@ let __kuroshiroInstance = null;
 let __kuroshiroInitPromise = null;
 
 // Proxy server configuration
-const PROXY_BASE_URL = 'http://localhost:3001';
+// const PROXY_BASE_URL = 'http://localhost:3001';
+const PROXY_BASE_URL = 'https://drag2ankijpproxy-production.up.railway.app';
 // For production, use: 'https://drag2ankijpproxy-production.up.railway.app'
 
 async function generateFurigana(text) {
@@ -137,119 +133,121 @@ async function generateFurigana(text) {
 
 // LLM 호출 함수 (일본어 단어 의미 조회용)
 async function callLLMForWordMeaning(text) {
-    try {
-        const response = await fetch(`${PROXY_BASE_URL}/openai/chat`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                prompt_type: 'word_meaning',
-                messages: [
-                    {
-                        role: 'user',
-                        content: text
-                    }
-                ],
-                max_tokens: 300,
-                temperature: 0.1
-            })
+    return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({
+            type: 'PROXY_OPENAI',
+            prompt_type: 'word_meaning',
+            messages: [
+                {
+                    role: 'user',
+                    content: text
+                }
+            ]
+        }, response => {
+            if (response && response.success) {
+                const data = response.result;
+                console.log('일본어 LLM API 응답:', data);
+                
+                if (data.error) {
+                    reject(new Error(`OpenAI API Error: ${data.error.message}`));
+                    return;
+                }
+                
+                if (data.status === 'error') {
+                    reject(new Error(`Proxy Server Error ${data.code}: ${data.message}`));
+                    return;
+                }
+                
+                if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+                    console.error('LLM API response structure:', data);
+                    reject(new Error('Invalid API response structure'));
+                    return;
+                }
+                
+                resolve(data.choices[0].message.content.trim());
+            } else {
+                reject(new Error(response ? response.error : '일본어 LLM API 호출 오류'));
+            }
         });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log('일본어 LLM API 응답:', data);
-        
-        // OpenAI API 에러 응답 처리
-        if (data.error) {
-            throw new Error(`OpenAI API Error: ${data.error.message}`);
-        }
-        
-        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-            throw new Error('Invalid API response structure');
-        }
-        
-        return data.choices[0].message.content.trim();
-    } catch (error) {
-        console.error('LLM API 호출 오류:', error);
-        throw error;
-    }
+    });
 }
 
 // LLM 호출 함수 (영어 단어 의미 조회용)
 async function callLLMForEnglishWordMeaning(text) {
-    try {
-        const response = await fetch(`${PROXY_BASE_URL}/openai/chat`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                prompt_type: 'english_word_meaning',
-                messages: [
-                    {
-                        role: 'user',
-                        content: text
-                    }
-                ],
-                max_tokens: 300,
-                temperature: 0.1
-            })
+    return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({
+            type: 'PROXY_OPENAI',
+            prompt_type: 'english_word_meaning',
+            messages: [
+                {
+                    role: 'user',
+                    content: text
+                }
+            ]
+        }, response => {
+            if (response && response.success) {
+                const data = response.result;
+                console.log('영어 LLM API 응답:', data);
+                
+                if (data.error) {
+                    reject(new Error(`OpenAI API Error: ${data.error.message}`));
+                    return;
+                }
+                
+                if (data.status === 'error') {
+                    reject(new Error(`Proxy Server Error ${data.code}: ${data.message}`));
+                    return;
+                }
+                
+                if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+                    console.error('LLM API response structure:', data);
+                    reject(new Error('Invalid API response structure'));
+                    return;
+                }
+                
+                resolve(data.choices[0].message.content.trim());
+            } else {
+                reject(new Error(response ? response.error : '영어 LLM API 호출 오류'));
+            }
         });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log('영어 LLM API 응답:', data);
-        
-        // OpenAI API 에러 응답 처리
-        if (data.error) {
-            throw new Error(`OpenAI API Error: ${data.error.message}`);
-        }
-        
-        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-            throw new Error('Invalid API response structure');
-        }
-        
-        return data.choices[0].message.content.trim();
-    } catch (error) {
-        console.error('영어 LLM API 호출 오류:', error);
-        throw error;
-    }
+    });
 }
 
 async function translateWithDeepL(text, sourceLanguage = 'JA') {
-    try {
-        const endpoint = sourceLanguage === 'EN' ? '/deepl/translate-english' : '/deepl/translate';
-        const response = await fetch(`${PROXY_BASE_URL}${endpoint}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                text: text,
-                target_lang: 'KO',
-                source_lang: sourceLanguage
-            })
+    return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({
+            type: 'PROXY_DEEPL',
+            text: text,
+            sourceLanguage: sourceLanguage
+        }, response => {
+            if (response && response.success) {
+                const data = response.result;
+                console.log('DeepL API 응답:', data);
+                
+                if (data.error) {
+                    reject(new Error(`DeepL API Error: ${data.error.message}`));
+                    return;
+                }
+                
+                if (data.status === 'error') {
+                    reject(new Error(`Proxy Server Error ${data.code}: ${data.message}`));
+                    return;
+                }
+                
+                // DeepL 프록시 응답 구조 확인: data.data.translations 또는 data.translations
+                const translations = data.data?.translations || data.translations;
+                if (!translations || !translations[0] || !translations[0].text) {
+                    console.error('DeepL API response structure:', data);
+                    reject(new Error('Invalid API response structure'));
+                    return;
+                }
+                
+                resolve(translations[0].text);
+            } else {
+                reject(new Error(response ? response.error : 'DeepL API 호출 오류'));
+            }
         });
-
-        const res = await response.json();
-        
-        if (!res || !res.success) {
-            throw new Error(res?.error || 'DeepL proxy failed');
-        }
-        const translations = res.data?.translations;
-        const translation = translations && translations[0]?.text ? translations[0].text : '';
-        return translation;
-    } catch (error) {
-        console.error('DeepL 번역 오류:', error);
-        return '';
-    }
+    });
 }
 
 export async function fetchLLMMeaning(text) {
@@ -388,20 +386,17 @@ export async function loadWordInfo(text) {
 
         if (!wordInfo) {
             // API 요청
-            const [jishoResult, llmMeaningResult, kanjiResult] = await Promise.allSettled([
-                fetchJishoData(text),
+            const [llmMeaningResult, kanjiResult] = await Promise.allSettled([
                 fetchLLMMeaning(text), // settings 인자 제거
                 fetchKanjiData(text)  // settings 인자 제거
             ]);
 
             console.log('API 요청 결과:', {
-                jishoResult,
                 llmMeaningResult,
                 kanjiResult
             });
 
             wordInfo = {
-                jisho: safeValue(jishoResult),
                 llmMeaning: safeValue(llmMeaningResult),
                 kanji: safeValue(kanjiResult)
             };
