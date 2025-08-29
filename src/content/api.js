@@ -8,7 +8,7 @@ if (typeof console !== 'undefined' && __D2A_SILENCE_LOG__) {
 import { getHanjaInfo } from './hanja';
 import { safeValue, tokenize, isSingleWord, getTextLanguage, isEnglishWord } from './utils';
 import { displayWordInfo, displayError } from './popup';
-import { getKanjiFromDB, setKanjiToDB, getWordFromDB, setWordToDB, getEnglishWordFromDB, setEnglishWordToDB } from './firebase';
+import { getKanjiFromDB, setKanjiToDB, getWordFromDB, setWordToDB, getEnglishWordFromDB, setEnglishWordToDB } from './firebaseProxy';
 import { settings } from './settings';
 import Kuroshiro from 'kuroshiro';
 import KuromojiAnalyzer from 'kuroshiro-analyzer-kuromoji';
