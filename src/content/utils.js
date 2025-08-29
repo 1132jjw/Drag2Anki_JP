@@ -16,6 +16,36 @@ export function isJapaneseTextOnly(text) {
     return hasJapaneseRegex.test(text) && !hasKoreanRegex.test(text);
 }
 
+export function isEnglishTextOnly(text) {
+    // 최소 한 글자 이상의 영어 알파벳이 포함되어야 함
+    const hasEnglishRegex = /[A-Za-z]/;
+    // 일본어나 한국어가 포함되면 false
+    const hasJapaneseRegex = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/;
+    const hasKoreanRegex = /[\uAC00-\uD7A3\u1100-\u11FF\u3130-\u318F]/;
+    
+    return hasEnglishRegex.test(text) && 
+           !hasJapaneseRegex.test(text) && !hasKoreanRegex.test(text);
+}
+
+export function isEnglishWord(text) {
+    // 영어 단어 판별: 공백이 없고, 알파벳과 특수문자 포함, 길이 제한
+    const trimmed = text.trim();
+    const hasNoSpaces = !trimmed.includes(' ');
+    const isValidEnglishWord = /^[A-Za-z'",;{}()\[\]*&.-]+$/.test(trimmed);
+    const isReasonableLength = trimmed.length <= 30; // 단어는 보통 30자 이하
+    
+    return hasNoSpaces && isValidEnglishWord && isReasonableLength;
+}
+
+export function getTextLanguage(text) {
+    if (isJapaneseTextOnly(text)) {
+        return 'japanese';
+    } else if (isEnglishTextOnly(text)) {
+        return 'english';
+    }
+    return 'unknown';
+}
+
 export function removeJapaneseParens(text) {
     // 예: 生(ま)れる → 生まれる
     return text.replace(/[\(\)]/g, ''); // 괄호만 제거

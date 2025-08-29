@@ -121,9 +121,24 @@ export function displayWordInfo(wordInfo) {
     const tabsEl = shadowRoot.querySelector('.tabs');
     const meaningTab = shadowRoot.querySelector('#meaning-tab');
     const kanjiTab = shadowRoot.querySelector('#kanji-tab');
+    const kanjiTabBtn = shadowRoot.querySelector('[data-tab="kanji"]');
 
     loadingEl.style.display = 'none';
     tabsEl.style.display = 'flex';
+
+    // 영어 텍스트인 경우만 한자 탭 숨기기 (일본어는 항상 한자 탭 표시)
+    const isEnglish = wordInfo.llmMeaning && wordInfo.llmMeaning.language === 'english';
+    
+    if (isEnglish) {
+        kanjiTabBtn.style.display = 'none';
+        kanjiTab.style.display = 'none';
+        if (kanjiTabBtn.classList.contains('active')) {
+            switchTab('meaning');
+        }
+    } else {
+        kanjiTabBtn.style.display = 'block';
+        // kanjiTab은 CSS로 제어되므로 여기서 직접 display를 설정하지 않음
+    }
 
     // 뜻 탭 내용
     let readingHtml = '<div class="reading-text">정보가 없습니다.</div>';

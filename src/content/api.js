@@ -6,9 +6,9 @@ if (typeof console !== 'undefined' && __D2A_SILENCE_LOG__) {
 // api.js
 
 import { getHanjaInfo } from './hanja';
-import { safeValue, tokenize, isSingleWord } from './utils';
+import { safeValue, tokenize, isSingleWord, getTextLanguage, isEnglishWord } from './utils';
 import { displayWordInfo, displayError } from './popup';
-import { getKanjiFromDB, setKanjiToDB, getWordFromDB, setWordToDB } from './firebase';
+import { getKanjiFromDB, setKanjiToDB, getWordFromDB, setWordToDB, getEnglishWordFromDB, setEnglishWordToDB } from './firebase';
 import { settings } from './settings';
 import Kuroshiro from 'kuroshiro';
 import KuromojiAnalyzer from 'kuroshiro-analyzer-kuromoji';
@@ -97,8 +97,8 @@ let __kuroshiroInstance = null;
 let __kuroshiroInitPromise = null;
 
 // Proxy server configuration
-const PROXY_BASE_URL = 'https://drag2ankijpproxy-production.up.railway.app';
-// For local development, use: 'http://localhost:3001'
+const PROXY_BASE_URL = 'http://localhost:3001';
+// For production, use: 'https://drag2ankijpproxy-production.up.railway.app'
 
 async function generateFurigana(text) {
     try {
@@ -135,35 +135,98 @@ async function generateFurigana(text) {
     }
 }
 
+// LLM 호출 함수 (일본어 단어 의미 조회용)
 async function callLLMForWordMeaning(text) {
-    const response = await fetch(`${PROXY_BASE_URL}/openai/chat`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            model: 'gpt-4-1106-preview',
-            messages: [
-                {
-                    role: 'user',
-                    content: text
-                }
-            ],
-            max_tokens: 200,
-            prompt_type: 'word_meaning'
-        })
-    });
+    try {
+        const response = await fetch(`${PROXY_BASE_URL}/openai/chat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                prompt_type: 'word_meaning',
+                messages: [
+                    {
+                        role: 'user',
+                        content: text
+                    }
+                ],
+                max_tokens: 300,
+                temperature: 0.1
+            })
+        });
 
-    const data = await response.json();
-    const content = data?.choices?.[0]?.message?.content || '';
-    const meaningMatch = content.match(/뜻:\s*([\s\S]*)/);
-    const meaning = meaningMatch ? meaningMatch[1].trim() : content;
-    return meaning;
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('일본어 LLM API 응답:', data);
+        
+        // OpenAI API 에러 응답 처리
+        if (data.error) {
+            throw new Error(`OpenAI API Error: ${data.error.message}`);
+        }
+        
+        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+            throw new Error('Invalid API response structure');
+        }
+        
+        return data.choices[0].message.content.trim();
+    } catch (error) {
+        console.error('LLM API 호출 오류:', error);
+        throw error;
+    }
 }
 
-async function translateWithDeepL(text) {
+// LLM 호출 함수 (영어 단어 의미 조회용)
+async function callLLMForEnglishWordMeaning(text) {
     try {
-        const response = await fetch(`${PROXY_BASE_URL}/deepl/translate`, {
+        const response = await fetch(`${PROXY_BASE_URL}/openai/chat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                prompt_type: 'english_word_meaning',
+                messages: [
+                    {
+                        role: 'user',
+                        content: text
+                    }
+                ],
+                max_tokens: 300,
+                temperature: 0.1
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('영어 LLM API 응답:', data);
+        
+        // OpenAI API 에러 응답 처리
+        if (data.error) {
+            throw new Error(`OpenAI API Error: ${data.error.message}`);
+        }
+        
+        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+            throw new Error('Invalid API response structure');
+        }
+        
+        return data.choices[0].message.content.trim();
+    } catch (error) {
+        console.error('영어 LLM API 호출 오류:', error);
+        throw error;
+    }
+}
+
+async function translateWithDeepL(text, sourceLanguage = 'JA') {
+    try {
+        const endpoint = sourceLanguage === 'EN' ? '/deepl/translate-english' : '/deepl/translate';
+        const response = await fetch(`${PROXY_BASE_URL}${endpoint}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -171,7 +234,7 @@ async function translateWithDeepL(text) {
             body: JSON.stringify({
                 text: text,
                 target_lang: 'KO',
-                source_lang: 'JA'
+                source_lang: sourceLanguage
             })
         });
 
@@ -190,62 +253,124 @@ async function translateWithDeepL(text) {
 }
 
 export async function fetchLLMMeaning(text) {
-    const tokens = await tokenize(text);
-    const isWord = isSingleWord(tokens);
-
-    // 1) 항상 먼저 후리가나 생성
-    const reading = await generateFurigana(text);
-
-    // 2) 분기: 단어 vs 문장
-    if (isWord) {
-        // 2-1) 캐시(DB) 먼저 확인
-        try {
-            const dbData = await getWordFromDB(text);
-            if (dbData) {
-                console.log(`Firebase DB에서 단어 정보 찾음: ${text}`);
-                // DB의 reading이 없다면 이번에 생성한 reading을 보강해서 반환
-                return { reading: dbData.reading || reading, meaning: dbData.meaning };
+    const language = getTextLanguage(text);
+    
+    // 영어 텍스트인 경우
+    if (language === 'english') {
+        const isWord = isEnglishWord(text);
+        
+        if (isWord) {
+            // 영어 단어: Firebase에서 먼저 조회, 없으면 GPT로 사전 형식 제공
+            console.log(`영어 단어 의미 조회: ${text}`);
+            
+            // 1. Firebase에서 먼저 조회
+            let meaning = await getEnglishWordFromDB(text);
+            
+            if (meaning) {
+                console.log(`영어 단어 DB에서 조회 성공: ${text}`);
+                return { reading: text, meaning: meaning, language: 'english' };
             }
-        } catch (error) {
-            console.error(`Firebase DB 조회 오류 (${text}):`, error);
+            
+            // 2. DB에 없으면 GPT로 조회
+            console.log(`영어 단어 GPT 조회: ${text}`);
+            try {
+                meaning = await callLLMForEnglishWordMeaning(text);
+                
+                // 3. GPT 결과를 Firebase에 저장
+                if (meaning) {
+                    await setEnglishWordToDB(text, meaning);
+                }
+            } catch (e) {
+                console.error('LLM 영어 단어 의미 조회 오류:', e);
+                // 폴백으로 DeepL 사용
+                try {
+                    meaning = await translateWithDeepL(text, 'EN');
+                } catch (deeplError) {
+                    console.error('DeepL 폴백 오류:', deeplError);
+                }
+            }
+            return { reading: text, meaning: meaning, language: 'english' };
+        } else {
+            // 영어 문장: DeepL로 번역
+            console.log(`영어 문장 번역(DeepL): ${text}`);
+            let meaning = '';
+            try {
+                meaning = await translateWithDeepL(text, 'EN');
+            } catch (deeplError) {
+                console.error('DeepL 영어 번역 오류:', deeplError);
+                // 폴백으로 GPT 사용
+                try {
+                    meaning = await callLLMForEnglishWordMeaning(text);
+                } catch (e) {
+                    console.error('LLM 폴백 오류:', e);
+                }
+            }
+            return { reading: text, meaning: meaning, language: 'english' };
         }
+    }
+    
+    // 일본어 텍스트인 경우 (기존 로직)
+    if (language === 'japanese') {
+        const tokens = await tokenize(text);
+        const isWord = isSingleWord(tokens);
 
-        // 2-2) LLM에서 뜻 받아오기
-        let meaning = '';
-        try {
-            meaning = await callLLMForWordMeaning(text);
-        } catch (e) {
-            console.error('LLM 의미 조회 오류:', e);
-            meaning = '';
-        }
+        // 1) 항상 먼저 후리가나 생성
+        const reading = await generateFurigana(text);
 
-        // 2-3) DB 저장 (reading은 Kuroshiro 결과 사용)
-        try {
-            await setWordToDB(text, { reading: reading, meaning: meaning });
-            console.log(`Firebase DB에 단어 정보 저장: ${text}`);
-        } catch (error) {
-            console.error(`Firebase DB 저장 오류 (${text}):`, error);
-        }
+        // 2) 분기: 단어 vs 문장
+        if (isWord) {
+            // 2-1) 캐시(DB) 먼저 확인
+            try {
+                const dbData = await getWordFromDB(text);
+                if (dbData) {
+                    console.log(`Firebase DB에서 단어 정보 찾음: ${text}`);
+                    // DB의 reading이 없다면 이번에 생성한 reading을 보강해서 반환
+                    return { reading: dbData.reading || reading, meaning: dbData.meaning, language: 'japanese' };
+                }
+            } catch (error) {
+                console.error(`Firebase DB 조회 오류 (${text}):`, error);
+            }
 
-        return { reading: reading, meaning: meaning };
-    } else {
-        // 문장: DeepL 번역 우선, 실패 시 LLM 폴백
-        console.log(`문장 번역(DeepL) 시도: ${text}`);
-        let meaning = '';
-        try {
-            meaning = await translateWithDeepL(text);
-        } catch (deeplError) {
-            console.error('DeepL 번역 오류:', deeplError);
-        }
-        if (!meaning) {
+            // 2-2) LLM에서 뜻 받아오기
+            let meaning = '';
             try {
                 meaning = await callLLMForWordMeaning(text);
             } catch (e) {
-                console.error('LLM 폴백 오류:', e);
+                console.error('LLM 의미 조회 오류:', e);
+                meaning = '';
             }
+
+            // 2-3) DB 저장 (reading은 Kuroshiro 결과 사용)
+            try {
+                await setWordToDB(text, { reading: reading, meaning: meaning });
+                console.log(`Firebase DB에 단어 정보 저장: ${text}`);
+            } catch (error) {
+                console.error(`Firebase DB 저장 오류 (${text}):`, error);
+            }
+
+            return { reading: reading, meaning: meaning, language: 'japanese' };
+        } else {
+            // 문장: DeepL 번역 우선, 실패 시 LLM 폴백
+            console.log(`문장 번역(DeepL) 시도: ${text}`);
+            let meaning = '';
+            try {
+                meaning = await translateWithDeepL(text, 'JA');
+            } catch (deeplError) {
+                console.error('DeepL 번역 오류:', deeplError);
+            }
+            if (!meaning) {
+                try {
+                    meaning = await callLLMForWordMeaning(text);
+                } catch (e) {
+                    console.error('LLM 폴백 오류:', e);
+                }
+            }
+            return { reading: reading, meaning: meaning, language: 'japanese' };
         }
-        return { reading: reading, meaning: meaning };
     }
+    
+    // 알 수 없는 언어인 경우
+    return { reading: text, meaning: '지원하지 않는 언어입니다.', language: 'unknown' };
 }
 
 export async function loadWordInfo(text) {
