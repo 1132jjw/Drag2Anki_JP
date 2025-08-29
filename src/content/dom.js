@@ -1,6 +1,6 @@
 // dom.js
 
-import { getSelectedTextWithoutRuby, isJapaneseTextOnly, removeJapaneseParens } from './utils';
+import { getSelectedTextWithoutRuby, isJapaneseTextOnly, isEnglishTextOnly, removeJapaneseParens } from './utils';
 import { showPopup, hidePopup } from './popup';
 import { popup } from './popup';
 
@@ -8,11 +8,12 @@ export function handleTextSelection(arg) {
     // 팝업이 열려있으면 무시
     if (popup && popup.contains(arg?.target)) return;
 
+    // 구글 검색창에서 텍스트 추출
     if (typeof arg === 'string') {
         const text = arg.trim();
         const searchBox = document.querySelector('textarea[name="q"], input[name="q"]');
-        if (text && isJapaneseTextOnly(text)) {
-            const normalizedText = removeJapaneseParens(text);
+        if (text && (isJapaneseTextOnly(text) || isEnglishTextOnly(text))) {
+            const normalizedText = isJapaneseTextOnly(text) ? removeJapaneseParens(text) : text;
             const rect = searchBox.getBoundingClientRect();
             showPopup(text, rect, normalizedText);
         } else {
@@ -21,11 +22,12 @@ export function handleTextSelection(arg) {
         return;
     }
 
+    // 드랙그해서 텍스트 추출
     setTimeout(() => {
         const selectedText = getSelectedTextWithoutRuby();
 
-        if (selectedText && isJapaneseTextOnly(selectedText)) {
-            const normalizedText = removeJapaneseParens(selectedText);
+        if (selectedText && (isJapaneseTextOnly(selectedText) || isEnglishTextOnly(selectedText))) {
+            const normalizedText = isJapaneseTextOnly(selectedText) ? removeJapaneseParens(selectedText) : selectedText;
             const selection = window.getSelection();
             const range = selection.getRangeAt(0);
             const rect = range.getBoundingClientRect();

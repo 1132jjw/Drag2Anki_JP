@@ -183,15 +183,20 @@ export function createAnkiNote(text, wordInfo, deckName) {
         meaning = wordInfo.llmMeaning.meaning;
     }
     
-    if (wordInfo.llmMeaning && wordInfo.llmMeaning.reading) {
-        reading = wordInfo.llmMeaning.reading;
-    } else if (wordInfo.jisho && wordInfo.jisho.japanese[0].reading) {
-        // LLM에서 후리가나를 받지 못한 경우 Jisho API 사용 (fallback)
-        reading = wordInfo.jisho.japanese[0].reading;
-    }
+    // 영어가 아닌 경우에만 reading 처리
+    const isEnglish = wordInfo.llmMeaning && wordInfo.llmMeaning.language === 'english';
     
-    if (!isKanaOnly(text) && reading) {
-        meaning = reading + '\n\n' + meaning;
+    if (!isEnglish) {
+        if (wordInfo.llmMeaning && wordInfo.llmMeaning.reading) {
+            reading = wordInfo.llmMeaning.reading;
+        } else if (wordInfo.jisho && wordInfo.jisho.japanese[0].reading) {
+            // LLM에서 후리가나를 받지 못한 경우 Jisho API 사용 (fallback)
+            reading = wordInfo.jisho.japanese[0].reading;
+        }
+        
+        if (!isKanaOnly(text) && reading) {
+            meaning = reading + '\n\n' + meaning;
+        }
     }
     
     fields[settings.fieldMapping.word] = text;

@@ -177,3 +177,71 @@ export async function hasWordInDB(word) {
         return false;
     }
 }
+
+/**
+ * 영어 단어 정보를 Firestore에서 조회
+ * @param {string} word - 조회할 영어 단어
+ * @returns {Promise<Object|null>} 영어 단어 정보 또는 null
+ */
+export async function getEnglishWordFromDB(word) {
+    try {
+        const db = await getDB();
+        const docRef = db.collection('english_words').doc(word.toLowerCase());
+        const docSnap = await docRef.get();
+        
+        if (docSnap.exists) {
+            const data = docSnap.data();
+            console.log(`영어 단어 DB에서 조회 성공: ${word}`);
+            return data.info; // 영어 단어 정보 반환
+        } else {
+            console.log(`영어 단어 DB에 없음: ${word}`);
+            return null;
+        }
+    } catch (error) {
+        console.error('영어 단어 DB 조회 오류:', error);
+        return null;
+    }
+}
+
+/**
+ * 영어 단어 정보를 Firestore에 저장
+ * @param {string} word - 저장할 영어 단어
+ * @param {Object} info - 저장할 영어 단어 정보
+ * @returns {Promise<boolean>} 저장 성공 여부
+ */
+export async function setEnglishWordToDB(word, info) {
+    try {
+        const db = await getDB();
+        const docRef = db.collection('english_words').doc(word.toLowerCase());
+        await docRef.set({
+            word: word.toLowerCase(),
+            originalWord: word,
+            info: info,
+            createdAt: new Date(),
+            updatedAt: new Date()
+        });
+        
+        console.log(`영어 단어 DB에 저장 성공: ${word}`);
+        return true;
+    } catch (error) {
+        console.error('영어 단어 DB 저장 오류:', error);
+        return false;
+    }
+}
+
+/**
+ * 영어 단어가 DB에 존재하는지 확인
+ * @param {string} word - 확인할 영어 단어
+ * @returns {Promise<boolean>} 존재 여부
+ */
+export async function hasEnglishWordInDB(word) {
+    try {
+        const db = await getDB();
+        const docRef = db.collection('english_words').doc(word.toLowerCase());
+        const docSnap = await docRef.get();
+        return docSnap.exists;
+    } catch (error) {
+        console.error('영어 단어 DB 존재 확인 오류:', error);
+        return false;
+    }
+}
