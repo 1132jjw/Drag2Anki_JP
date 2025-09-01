@@ -11,10 +11,10 @@ import contentCss from '../../content.css';
 
 export let popup = null;
 
-export function showPopup(displayText, rect, normalizedText) {
+export function showPopup(displayText, rect, normalizedText, originalLength) {
     hidePopup();
 
-    const container = createPopup(displayText, rect);
+    const container = createPopup(displayText, rect, originalLength);
     popup = container; // popup 변수가 container를 참조하도록 변경
     document.body.appendChild(container);
     
@@ -32,7 +32,7 @@ export function hidePopup() {
     }
 }
 
-export function createPopup(text, rect) {
+export function createPopup(text, rect, originalLength) {
     const container = document.createElement('div');
     container.id = 'drag2anki-jp-container';
     const shadowRoot = container.attachShadow({ mode: 'open' });
@@ -44,9 +44,20 @@ export function createPopup(text, rect) {
     const popup = document.createElement('div');
     popup.className = 'drag2anki-popup';
 
-    // 텍스트가 30자를 넘으면 잘라내고 ... 추가
+    // 텍스트 표시 로직
     const maxLength = 30;
-    const displayText = text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+    let displayText;
+    
+    if (originalLength > 1000) {
+        // 1000자 초과시 경고 메시지와 글자수 표시
+        displayText = `선택하신 텍스트가 1,000자를 초과해 처음 1,000자까지만 번역되니 참고해 주세요. (${originalLength}/1000)`;
+    } else if (text.length > maxLength) {
+        // 30자 초과시 잘라내고 ... 추가
+        displayText = text.substring(0, maxLength) + '...';
+    } else {
+        // 30자 이하시 그대로 표시
+        displayText = text;
+    }
 
     popup.innerHTML = `
         <div class="popup-header">

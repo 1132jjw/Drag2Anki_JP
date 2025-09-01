@@ -13,9 +13,11 @@ export function handleTextSelection(arg) {
         const text = arg.trim();
         const searchBox = document.querySelector('textarea[name="q"], input[name="q"]');
         if (text && (isJapaneseTextOnly(text) || isEnglishTextOnly(text))) {
-            const normalizedText = isJapaneseTextOnly(text) ? removeJapaneseParens(text) : text;
+            // 1000자 제한 적용
+            const limitedText = text.length > 1000 ? text.substring(0, 1000) : text;
+            const normalizedText = isJapaneseTextOnly(limitedText) ? removeJapaneseParens(limitedText) : limitedText;
             const rect = searchBox.getBoundingClientRect();
-            showPopup(text, rect, normalizedText);
+            showPopup(limitedText, rect, normalizedText, text.length);
         } else {
             hidePopup();
         }
@@ -27,12 +29,14 @@ export function handleTextSelection(arg) {
         const selectedText = getSelectedTextWithoutRuby();
 
         if (selectedText && (isJapaneseTextOnly(selectedText) || isEnglishTextOnly(selectedText))) {
-            const normalizedText = isJapaneseTextOnly(selectedText) ? removeJapaneseParens(selectedText) : selectedText;
+            // 1000자 제한 적용
+            const limitedText = selectedText.length > 1000 ? selectedText.substring(0, 1000) : selectedText;
+            const normalizedText = isJapaneseTextOnly(limitedText) ? removeJapaneseParens(limitedText) : limitedText;
             const selection = window.getSelection();
             const range = selection.getRangeAt(0);
             const rect = range.getBoundingClientRect();
-            // 팝업에는 원본, 내부처리에는 정규화된 텍스트 전달
-            showPopup(selectedText, rect, normalizedText);
+            // 팝업에는 제한된 텍스트, 내부처리에는 정규화된 텍스트 전달
+            showPopup(limitedText, rect, normalizedText, selectedText.length);
         } else {
             hidePopup();
         }
