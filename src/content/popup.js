@@ -44,9 +44,13 @@ export function createPopup(text, rect) {
     const popup = document.createElement('div');
     popup.className = 'drag2anki-popup';
 
+    // 텍스트가 30자를 넘으면 잘라내고 ... 추가
+    const maxLength = 30;
+    const displayText = text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+
     popup.innerHTML = `
         <div class="popup-header">
-            <span class="word-text">${text}</span>
+            <span class="word-text" title="${text}">${displayText}</span>
             <button class="close-btn">&times;</button>
         </div>
         <div class="popup-content">
