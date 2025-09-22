@@ -559,17 +559,23 @@ chrome.storage.onChanged.addListener((changes, area) => {
     }
 });
 
-// 웹 요청 인터셉트 (필요시 사용)
-chrome.webRequest.onBeforeRequest.addListener(
-    (details) => {
-        // API 요청 로깅 또는 수정
-        if (details.url.includes('jisho.org') || details.url.includes('openai.com')) {
-            console.log('API 요청:', details.url);
-        }
-    },
-    { urls: ['<all_urls>'] },
-    ['requestBody']
-);
+// 웹 요청 인터셉트 (필요시 사용) - 권한이 없으면 등록하지 않음
+if (chrome.webRequest && chrome.webRequest.onBeforeRequest) {
+    try {
+        chrome.webRequest.onBeforeRequest.addListener(
+            (details) => {
+                // API 요청 로깅 또는 수정 (디버깅 용도)
+                if (details.url.includes('jisho.org') || details.url.includes('openai.com')) {
+                    console.log('API 요청:', details.url);
+                }
+            },
+            { urls: ['<all_urls>'] },
+            ['requestBody']
+        );
+    } catch (e) {
+        // 권한이 없는 환경에서는 조용히 무시
+    }
+}
 
 // 탭 업데이트 감지
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
