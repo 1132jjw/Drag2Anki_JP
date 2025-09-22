@@ -286,8 +286,8 @@ export function showDuplicateModal(existing, onConfirm, onCancel) {
             <div class="dup-header">이미 저장된 항목</div>
             <div class="dup-body">
                 <div class="dup-field">
-                    <span class="dup-label">노트 타입</span>
-                    <div class="dup-value">${existing.modelName || 'Basic'}</div>
+                    <span class="dup-label">덱 이름</span>
+                    <div class="dup-value">${existing.deckName || '알 수 없음'}</div>
                 </div>
                 <div class="dup-field">
                     <span class="dup-label">Front</span>

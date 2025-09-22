@@ -409,14 +409,42 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 const backResolved = fieldKeys.find(k => k.toLowerCase() === (backKey || '').toLowerCase()) || backKey;
                 const front = note.fields?.[resolvedKey]?.value || '';
                 const back = note.fields?.[backResolved]?.value || '';
-                // console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT note:', { id: note.noteId || note.id || ids[0], modelName: note.modelName, front, back });
+                
+                // 덱 이름을 가져오기 위해 카드 정보 조회
+                let deckName = '';
+                try {
+                    const noteId = note.noteId || note.id || ids[0];
+                    const cardsRes = await fetch(request.ankiConnectUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'findCards', version: 6, params: { query: `nid:${noteId}` } })
+                    });
+                    const cardsData = await cardsRes.json();
+                    if (cardsData.result && cardsData.result.length > 0) {
+                        const cardId = cardsData.result[0];
+                        const cardInfoRes = await fetch(request.ankiConnectUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'cardsInfo', version: 6, params: { cards: [cardId] } })
+                        });
+                        const cardInfoData = await cardInfoRes.json();
+                        if (cardInfoData.result && cardInfoData.result.length > 0) {
+                            deckName = cardInfoData.result[0].deckName || '';
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[Drag2Anki/bg] Failed to get deck name:', e);
+                }
+                
+                // console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT note:', { id: note.noteId || note.id || ids[0], modelName: note.modelName, front, back, deckName });
                 sendResponse({
                     success: true,
                     result: {
                         id: note.noteId || note.id || ids[0],
                         modelName: note.modelName,
                         front,
-                        back
+                        back,
+                        deckName
                     }
                 });
             } catch (error) {
