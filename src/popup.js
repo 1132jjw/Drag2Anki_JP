@@ -80,11 +80,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 elements.deckNameSelect.appendChild(option);
             });
 
-            // 저장된 덱 이름 선택
+            // 저장된 덱 이름 선택 또는 첫 번째 덱 선택
             chrome.storage.sync.get(['drag2anki_settings'], (result) => {
                 const settings = result.drag2anki_settings || defaultSettings;
+                let selectedDeck = null;
+                
+                // 저장된 덱이 유효하면 선택
                 if (settings.deckName && deckNames.includes(settings.deckName)) {
-                    elements.deckNameSelect.value = settings.deckName;
+                    selectedDeck = settings.deckName;
+                } 
+                // 저장된 덱이 없고 덱 목록이 있으면 첫 번째 덱 선택
+                else if (deckNames.length > 0) {
+                    selectedDeck = deckNames[0];
+                    // 저장된 설정도 업데이트
+                    const updatedSettings = { ...settings, deckName: selectedDeck };
+                    chrome.storage.sync.set({ drag2anki_settings: updatedSettings });
+                }
+                
+                if (selectedDeck) {
+                    elements.deckNameSelect.value = selectedDeck;
                 }
             });
 
