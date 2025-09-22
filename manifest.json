@@ -6,16 +6,12 @@
   "permissions": [
     "activeTab",
     "storage",
-    "scripting",
-    "contextMenus",
-    "webRequest"
+    "contextMenus"
   ],
   "host_permissions": [
     "http://localhost:8765/*",
-    "http://localhost:3001/*",
     "https://drag2ankijpproxy-production.up.railway.app/*",
-    "https://kanjiapi.dev/*",
-    "https://www.google.com/*"
+    "https://kanjiapi.dev/*"
   ],
   "content_scripts": [
     {
