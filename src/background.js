@@ -41,24 +41,7 @@ chrome.runtime.onInstalled.addListener(() => {
     });
 });
 
-// 컨텍스트 메뉴 추가
-chrome.runtime.onInstalled.addListener(() => {
-    chrome.contextMenus.create({
-        id: 'drag2anki-translate',
-        title: 'Drag2Anki로 번역',
-        contexts: ['selection']
-    });
-});
-
-// 컨텍스트 메뉴 클릭 이벤트
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-    if (info.menuItemId === 'drag2anki-translate') {
-        chrome.tabs.sendMessage(tab.id, {
-            action: 'translateSelection',
-            text: info.selectionText
-        });
-    }
-});
+// 컨텍스트 메뉴 기능 제거됨 (권한 최소화 및 UX 단순화)
 
 // 키보드 단축키 처리
 chrome.commands.onCommand.addListener((command) => {
