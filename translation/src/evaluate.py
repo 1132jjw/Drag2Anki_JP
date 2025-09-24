@@ -4,20 +4,20 @@ import evaluate
 import pandas as pd
 from tqdm import tqdm
 from . import config
-from .dataset import download_data
 
 def evaluate_model(model_path):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Ensure test data is available
-    download_data()
-
     # Load the fine-tuned model and tokenizer
+    # TODO: 모델 불러오기 함수 따로 분리
     model = AutoModelForSeq2SeqLM.from_pretrained(model_path)
     tokenizer = AutoTokenizer.from_pretrained(model_path)
+    
     model.to(device)
     model.eval()
 
+    
+    # TODO: 데이터 불러오기 따로 분리
     # Load test data
     test_df = pd.read_csv("data/test.csv")
 
