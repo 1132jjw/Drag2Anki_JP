@@ -145,8 +145,6 @@ document.addEventListener('DOMContentLoaded', function() {
         elements.refreshDecks.addEventListener('click', loadDeckNames);
     }
 
-    // 제거: URL 입력 검증 관련 로직은 더 이상 사용되지 않음
-
     // testAnkiConnection은 더 이상 별도로 사용하지 않음 (새로고침 버튼에서 통합 수행)
 
     function saveSettings() {
