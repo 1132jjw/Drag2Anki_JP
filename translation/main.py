@@ -1,14 +1,19 @@
 import argparse
-from src.train import train
-from src.evaluate import evaluate_model
+from src.config import parse_arg
+from src.dataset import get_dataloaders
+from src.model import get_model_and_tokenizer
+from src.evaluate import get_score
 
 def main(args):
-    data_load(args)
-    model(args)
+    model, tokenizer = get_model_and_tokenizer(args)
+    
+    # 미리 data tokenize
+    # train, valid, test dataset
+    dataloaders = get_dataloaders(args, tokenizer)
+    
     if args.is_train == "train":
-        model = train(args)
-    predict(args)
-    save_log(args)
+        model = train(args, dataloaders, model)
+    score = get_score(args, dataloaders, model, tokenizer)
 
 
 if __name__ == "__main__":

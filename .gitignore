@@ -1,5 +1,4 @@
 /dist
-/translation
 node_modules
 
 # 환경변수 파일 (민감한 정보 포함)

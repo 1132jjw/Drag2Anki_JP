@@ -1,25 +1,14 @@
 import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import evaluate
-import pandas as pd
 from tqdm import tqdm
 from . import config
 
-def evaluate_model(model_path):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # Load the fine-tuned model and tokenizer
-    # TODO: 모델 불러오기 함수 따로 분리
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_path)
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
-    
+def get_score(args, dataloaders, model, tokenizer):
+    device = torch.device(args.device)
     model.to(device)
     model.eval()
 
-    
-    # TODO: 데이터 불러오기 따로 분리
-    # Load test data
-    test_df = pd.read_csv("data/test.csv")
+    test_dataloader = dataloaders['test']
 
     # Initialize metrics
     bleu = evaluate.load("bleu")
@@ -30,29 +19,33 @@ def evaluate_model(model_path):
     references = []
 
     print("Generating translations for evaluation...")
-    for _, row in tqdm(test_df.iterrows(), total=len(test_df)):
-        source_text = row["ja"]  # Assuming 'ja' is the source language column
-        target_text = row["ko"]  # Assuming 'ko' is the target language column
+    # NLLB requires forcing the decoder BOS token to the target language code
+    forced_bos_token_id = None
+    if hasattr(tokenizer, "lang_code_to_id") and getattr(tokenizer, "tgt_lang", None):
+        forced_bos_token_id = tokenizer.lang_code_to_id.get(tokenizer.tgt_lang)
 
-        inputs = tokenizer(
-            source_text,
-            return_tensors="pt",
-            max_length=config.MAX_LENGTH,
-            padding="max_length",
-            truncation=True,
-        ).to(device)
+    for batch in tqdm(test_dataloader):
+        input_ids = batch["input_ids"].to(device)
+        attention_mask = batch["attention_mask"].to(device)
 
-        with torch.no_grad():
-            generated_ids = model.generate(
-                inputs.input_ids,
-                attention_mask=inputs.attention_mask,
-                max_new_tokens=config.MAX_LENGTH,
-            )
-        translated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+        gen_kwargs = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "max_length": config.MAX_LENGTH,
+        }
+        if forced_bos_token_id is not None:
+            gen_kwargs["forced_bos_token_id"] = forced_bos_token_id
 
-        predictions.append(translated_text)
-        references.append([target_text])  # References should be a list of lists for some metrics
+        generated = model.generate(**gen_kwargs)
+        batch_predictions = tokenizer.batch_decode(generated, skip_special_tokens=True)
+        predictions.extend(batch_predictions)
 
+        # Decode references from labels in the batch
+        labels = batch["labels"].to(device)
+        batch_references = tokenizer.batch_decode(labels, skip_special_tokens=True)
+        # Many metrics expect list of list (multiple references per prediction). Wrap each ref in a list
+        references.extend([[ref] for ref in batch_references])
+        
     print("\nCalculating metrics...")
     bleu_score = bleu.compute(predictions=predictions, references=references)
     ter_score = ter.compute(predictions=predictions, references=references)
@@ -61,9 +54,3 @@ def evaluate_model(model_path):
     print(f"BLEU: {bleu_score['bleu']:.2f}")
     print(f"TER: {ter_score['score']:.2f}")
     print(f"chrF: {chrf_score['score']:.2f}")
-
-if __name__ == "__main__":
-    # Replace 'nllb-finetuned-epoch-3' with the actual path to your saved model checkpoint
-    # For example, if you saved the model after 3 epochs, it would be 'nllb-finetuned-epoch-3'
-    model_checkpoint_path = "nllb-finetuned-epoch-3" # <--- 여기에 학습된 모델 경로를 입력하세요
-    evaluate_model(model_checkpoint_path)

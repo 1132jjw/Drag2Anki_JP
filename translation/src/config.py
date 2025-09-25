@@ -17,18 +17,18 @@ def parse_arg():
     parser = argparse.ArgumentParser(description='parser')
     
     parser.add_argument("--seed", default=42, type=int, help="seed")
-    parser.add_argument("--device", default="gpu", type=str, help="cpu or gpu")
+    parser.add_argument("--device", default="cuda", type=str, help="cpu or cuda")
     
     # train, test
-    parser.add_argument("--is_train", default="train", choice=["train", "inference"], 
-                        type=str, help="train or inference")
+    parser.add_argument("--is_train", default="train", choices=["train", "test"], 
+                        type=str, help="train or test")
     
     # src, target 언어 설정
-    parser.add_argument("--source_lang", default="jpn", type=str)
-    parser.add_argument("--target_lang", default="kor", type=str)
+    parser.add_argument("--source_lang", default="ja", type=str)
+    parser.add_argument("--target_lang", default="ko", type=str)
     
     # 데이터 위치
-    parser.add_argument("--data_dir", default="../data/train/", type=str)
+    parser.add_argument("--data_dir", default="../data", type=str)
     
     # 모델 선택
     parser.add_argument("--model", default="", type=str, help="model")
@@ -36,6 +36,6 @@ def parse_arg():
     # 테스트 결과 저장
     parser.add_argument("--test_result_dir", default="./test_result/", type=str)
     
-    arg = parser.parse_arg()
+    arg = parser.parse_args()
     
     return arg 

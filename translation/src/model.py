@@ -3,7 +3,9 @@ import openai
 import requests
 import os
 from dotenv import load_dotenv
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, BitsAndBytesConfig
+from peft import get_peft_model, LoraConfig, TaskType
+
 from . import config
 
 load_dotenv()
@@ -63,42 +65,44 @@ class DeepL:
             print(f"DeepL API 요청 실패: {e}")
             return None
 
+def get_model_and_tokenizer(args):
+    # Initialize tokenizer with language codes for NLLB (or similar multilingual models)
+    src_lang_code = getattr(config, "SRC_LANG", None)
+    tgt_lang_code = getattr(config, "TGT_LANG", None)
 
-import torch
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, BitsAndBytesConfig
-from peft import get_peft_model, LoraConfig, TaskType
-from . import config
+    if src_lang_code and tgt_lang_code:
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model,
+            src_lang=src_lang_code,
+            tgt_lang=tgt_lang_code,
+        )
+        # Ensure attributes exist for evaluate forced_bos_token_id logic
+        tokenizer.src_lang = src_lang_code
+        tokenizer.tgt_lang = tgt_lang_code
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(args.model)
 
-def get_model_and_tokenizer():
-    quantization_config = BitsAndBytesConfig(load_in_4bit=True)
-    model = AutoModelForSeq2SeqLM.from_pretrained(
-        config.MODEL_NAME,
-        quantization_config=quantization_config,
-        device_map="auto",
-    )
-    tokenizer = AutoTokenizer.from_pretrained(
-        config.MODEL_NAME, src_lang=config.SRC_LANG, tgt_lang=config.TGT_LANG
-    )
+    model = AutoModelForSeq2SeqLM.from_pretrained(args.model)
+    # quantization_config = BitsAndBytesConfig(load_in_4bit=True)
+    # model = AutoModelForSeq2SeqLM.from_pretrained(
+    #     config.MODEL_NAME,
+    #     quantization_config=quantization_config,
+    #     device_map="auto",
+    # )
+    # tokenizer = AutoTokenizer.from_pretrained(
+    #     config.MODEL_NAME, src_lang=config.SRC_LANG, tgt_lang=config.TGT_LANG
+    # )
 
-    lora_config = LoraConfig(
-        r=config.LORA_R,
-        lora_alpha=config.LORA_ALPHA,
-        target_modules=["q_proj", "v_proj"],
-        lora_dropout=config.LORA_DROPOUT,
-        bias="none",
-        task_type=TaskType.SEQ_2_SEQ_LM
-    )
+    # lora_config = LoraConfig(
+    #     r=config.LORA_R,
+    #     lora_alpha=config.LORA_ALPHA,
+    #     target_modules=["q_proj", "v_proj"],
+    #     lora_dropout=config.LORA_DROPOUT,
+    #     bias="none",
+    #     task_type=TaskType.SEQ_2_SEQ_LM
+    # )
 
-    model = get_peft_model(model, lora_config)
-    model.print_trainable_parameters()
+    # model = get_peft_model(model, lora_config)
+    # model.print_trainable_parameters()
 
     return model, tokenizer
-
-
-class CustomModel(nn.Module):
-    def __init__(self):
-        super().__init__()
-        pass
-
-    def forward(self, x):
-        pass
