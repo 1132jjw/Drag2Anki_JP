@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "드래그 단어장(드래그하고 번역해서 Anki에 저장)",
+  "name": "드래그 단어장 (드래그하고 번역해서 Anki에 저장)",
   "short_name": "드래그 단어장",
   "version": "1.0.0",
   "description": "일본어와 영어 학습을 위한 올인원 크롬 익스텐션, 드래그로 번역하고 Anki 카드로 바로 저장!",
