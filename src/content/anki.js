@@ -3,6 +3,44 @@ const __D2A_SILENCE_LOG__ = true;
 if (typeof console !== 'undefined' && __D2A_SILENCE_LOG__) {
     console.log = function () {};
 }
+
+// Ensure the popup stays fully visible after dynamic height changes (e.g., long messages)
+function ensurePopupVisible() {
+    if (!popup || !popup.shadowRoot) return;
+    const p = popup.shadowRoot.querySelector('.drag2anki-popup');
+    if (!p) return;
+    const rect = p.getBoundingClientRect();
+    const viewportBottom = window.innerHeight;
+    const overflowBottom = rect.bottom - viewportBottom + 8; // 8px margin
+    if (overflowBottom > 0) {
+        // move popup up by the overflow amount
+        const currentTop = parseFloat(p.style.top || '0');
+        p.style.top = (currentTop - overflowBottom) + 'px';
+    }
+}
+
+// --- Anki connection diagnosis ---
+function testAnkiConnectionClient() {
+    return new Promise((resolve) => {
+        chrome.runtime.sendMessage({ action: 'testAnkiConnection', url: settings.ankiConnectUrl }, (res) => {
+            resolve(res || { success: false, error: 'unknown', message: '연결 확인 중 오류가 발생했습니다.' });
+        });
+    });
+}
+
+async function showConnectivityHelp(baseMessage) {
+    const diag = await testAnkiConnectionClient();
+    if (diag && diag.success) {
+        // 연결은 가능한데 다른 오류인 경우
+        const msg = baseMessage || '작업 처리 중 오류가 발생했습니다.';
+        showSaveError(`${msg}`);
+        return;
+    }
+    const url = settings.ankiConnectUrl;
+    const hint = `Anki가 실행 중인지, AnkiConnect 애드온이 설치 및 활성화되었는지 확인해 주세요. 기본 주소는 ${url} 입니다.`;
+    const extra = diag && diag.message ? `\n${diag.message}` : '';
+    showSaveError(`Anki에 연결할 수 없습니다. ${hint}${extra}`);
+}
 // anki.js
 
 import { settings } from './settings';
@@ -260,12 +298,17 @@ export async function saveToAnki(text, deckName) {
                 showSaveError('이미 저장됨');
             }
         } else {
-            showSaveError('카드 저장에 실패했습니다.');
+            await showConnectivityHelp('카드 저장에 실패했습니다.');
         }
 
     } catch (error) {
         console.error('Anki 저장 오류:', error);
-        showSaveError(typeof error === 'string' ? error : 'Anki 연결에 실패했습니다.');
+        const msg = typeof error === 'string' ? error : (error?.message || '네트워크 오류');
+        if (/fetch|network|failed/i.test(msg)) {
+            await showConnectivityHelp();
+        } else {
+            showSaveError('작업 처리 중 오류가 발생했습니다.');
+        }
     }
 }
 
@@ -341,32 +384,53 @@ export async function addNoteToAnki(note) {
 
 export function showSaveSuccess() {
     if (!popup || !popup.shadowRoot) return;
-    const saveBtn = popup.shadowRoot.querySelector('.save-btn');
-    if (!saveBtn) return;
-
-    const originalText = saveBtn.textContent;
-    saveBtn.textContent = '저장됨!';
-    saveBtn.style.backgroundColor = '#4CAF50';
-
-    setTimeout(() => {
-        saveBtn.textContent = originalText;
-        saveBtn.style.backgroundColor = '';
-    }, 2000);
+    const root = popup.shadowRoot;
+    const saveBtn = root.querySelector('.save-btn');
+    if (saveBtn) {
+        const originalBg = saveBtn.style.backgroundColor;
+        saveBtn.style.backgroundColor = '#4CAF50';
+        setTimeout(() => { saveBtn.style.backgroundColor = originalBg; }, 1200);
+    }
+    // Show a success message box instead of shrinking into the button
+    let msg = root.querySelector('.save-msg');
+    if (!msg) {
+        msg = document.createElement('div');
+        msg.className = 'save-msg';
+        msg.style.cssText = 'margin-top:8px; white-space:pre-wrap; line-height:1.4; font-size:12px; color:#0a3; background:rgba(10,180,50,0.1); padding:8px 10px; border-radius:6px; max-width:100%; word-break:break-word; border:1px solid rgba(10,180,50,0.3)';
+        const footer = root.querySelector('.popup-footer');
+        if (footer) footer.appendChild(msg);
+    }
+    if (msg) {
+        msg.textContent = '저장됨!';
+        msg.style.display = 'block';
+    }
+    ensurePopupVisible();
 }
 
 export function showSaveError(message) {
     if (!popup || !popup.shadowRoot) return;
-    const saveBtn = popup.shadowRoot.querySelector('.save-btn');
-    if (!saveBtn) return;
-
-    const originalText = saveBtn.textContent;
-    saveBtn.textContent = message || '저장 실패';
-    saveBtn.style.backgroundColor = '#f44336';
-
-    setTimeout(() => {
-        saveBtn.textContent = originalText;
-        saveBtn.style.backgroundColor = '';
-    }, 2000);
+    const root = popup.shadowRoot;
+    // keep button color feedback briefly
+    const saveBtn = root.querySelector('.save-btn');
+    if (saveBtn) {
+        const originalBg = saveBtn.style.backgroundColor;
+        saveBtn.style.backgroundColor = '#f44336';
+        setTimeout(() => { saveBtn.style.backgroundColor = originalBg; }, 1200);
+    }
+    // Render a dedicated message area that can wrap long text
+    let msg = root.querySelector('.save-msg');
+    if (!msg) {
+        msg = document.createElement('div');
+        msg.className = 'save-msg';
+        msg.style.cssText = 'margin-top:8px; white-space:pre-wrap; line-height:1.5; font-size:12px; color:#b00020; background:rgba(244,67,54,0.08); padding:8px 10px; border-radius:6px; max-width:100%; word-break:break-word; border:1px solid rgba(244,67,54,0.25)';
+        const footer = root.querySelector('.popup-footer');
+        if (footer) footer.appendChild(msg);
+    }
+    if (msg) {
+        msg.textContent = message || '저장 실패';
+        msg.style.display = 'block';
+    }
+    ensurePopupVisible();
 }
 
 // Kanji save flow with duplicate handling (modal -> delete -> retry)
@@ -441,9 +505,20 @@ export async function saveKanjiToAnki(kanji, btnEl, deckName) {
             }
             return showKanjiSaveError(btnEl, '이미 저장됨');
         }
-        showKanjiSaveError(btnEl, '저장 실패');
+        // 연결 문제 진단 (간단 메시지)
+        const diag = await testAnkiConnectionClient();
+        if (!diag || !diag.success) {
+            showKanjiSaveError(btnEl, 'Anki 연결 실패');
+        } else {
+            showKanjiSaveError(btnEl, '저장 실패');
+        }
     } catch (error) {
-        showKanjiSaveError(btnEl, 'Anki 오류');
+        const msg = typeof error === 'string' ? error : (error?.message || '네트워크 오류');
+        if (/fetch|network|failed/i.test(msg)) {
+            showKanjiSaveError(btnEl, 'Anki 연결 실패');
+        } else {
+            showKanjiSaveError(btnEl, 'Anki 오류');
+        }
     }
 }
 

@@ -13,8 +13,8 @@
     font-size: 14px;
     min-width: 300px;
     max-width: 400px;
-    max-height: 500px;
-    overflow: hidden;
+    max-height: 90vh; /* responsive height to viewport */
+    overflow: visible; /* do not clip footer/message box */
     animation: fadeInUp 0.3s ease;
 }
 
@@ -75,7 +75,7 @@
 /* 콘텐츠 영역 */
 .popup-content {
     padding: 0;
-    max-height: 350px;
+    max-height: 65vh; /* leave space for footer */
     overflow-y: auto;
 }
 
@@ -255,8 +255,11 @@
 /* 푸터 */
 .popup-footer {
     padding: 16px;
+    padding-bottom: 20px;
     border-top: 1px solid #e8e8e8;
     background: #f9f9f9;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
 }
 
 .save-btn {

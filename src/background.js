@@ -329,11 +329,39 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                                     }
                                 } catch {}
                             }
-                            const existing = match ? {
+                            // Resolve back field name case-insensitively; fallback to any non-front field
+                let backKey = null;
+                if (match && match.fields) {
+                    const keys = Object.keys(match.fields);
+                    backKey = keys.find(k => k.toLowerCase() === 'back');
+                    if (!backKey) backKey = keys.find(k => k !== fieldName);
+                }
+                let deckNameResolved = '';
+                try {
+                    const noteId = match ? (match.noteId || match.id) : null;
+                    if (noteId) {
+                        const cardsRes = await fetch(request.ankiConnectUrl, {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'findCards', version: 6, params: { query: `nid:${noteId}` } })
+                        });
+                        const cardsData = await cardsRes.json();
+                        const cardIds = cardsData.result || [];
+                        if (cardIds.length) {
+                            const cardsInfoRes = await fetch(request.ankiConnectUrl, {
+                                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'cardsInfo', version: 6, params: { cards: [cardIds[0]] } })
+                            });
+                            const cardsInfoData = await cardsInfoRes.json();
+                            deckNameResolved = (cardsInfoData.result && cardsInfoData.result[0] && cardsInfoData.result[0].deckName) || '';
+                        }
+                    }
+                } catch {}
+                const existing = match ? {
                                 id: match.noteId || match.id || ids[0],
                                 modelName: match.modelName,
                                 front: match.fields?.[fieldName]?.value || '',
-                                back: (match.fields?.Back?.value || '')
+                                back: (backKey ? (match.fields?.[backKey]?.value || '') : ''),
+                                deckName: deckNameResolved || deckName || '알 수 없음'
                             } : null;
                             return sendResponse({ success: false, duplicate: true, error: errMsg, existing });
                         });
@@ -472,7 +500,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 const back = note.fields?.[backResolved]?.value || '';
                 
                 // 덱 이름을 가져오기 위해 카드 정보 조회 (지정 덱 우선)
-                let deckName = '';
+                let deckName = request.deckName || '';
                 try {
                     const noteId = note.noteId || note.id || ids[0];
                     const cardsRes = await fetch(request.ankiConnectUrl, {
