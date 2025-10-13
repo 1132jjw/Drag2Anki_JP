@@ -209,7 +209,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <small>
             ${manifest.name} v${manifest.version}<br>
             <a href="https://github.com/1132jjw/Drag2Anki_JP" target="_blank">GitHub</a> | 
-            <a href="mailto:draganki01@gmail.com">문의</a>
+             1132jjw@naver.com
         </small>
     `;
     document.querySelector('.info').appendChild(versionInfo);
