@@ -143,7 +143,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             try {
                 const modelName = request.modelName;
                 const text = request.text;
-                // 모델의 첫 필드명 조회 (없으면 요청 필드명 사용)
+                // 요청 필드명을 우선 사용. 모델 필드 조회 시에만 동일 이름(대소문자 무시) 매칭을 시도.
                 let primaryField = request.fieldName;
                 let modelFields = null;
                 if (modelName) {
@@ -155,15 +155,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                         const mfData = await mfRes.json();
                         if (Array.isArray(mfData?.result) && mfData.result.length > 0) {
                             modelFields = mfData.result;
-                            primaryField = modelFields[0];
+                            const matched = modelFields.find(k => k.toLowerCase() === (primaryField || '').toLowerCase());
+                            if (!matched) {
+                                // 모델에 해당 필드가 없으면, 이 모델 기준으로는 중복이 아님
+                                return sendResponse({ success: true, isDuplicate: false });
+                            }
+                            primaryField = matched; // 동일 이름이 있을 경우만 정규화
                         }
-                        console.log('[Drag2Anki/bg] model first field:', modelName, '->', primaryField);
+                        console.log('[Drag2Anki/bg] resolved field:', modelName, '->', primaryField);
                     } catch (e) {
-                        // console.warn('[Drag2Anki/bg] modelFieldNames failed, fallback to request.fieldName:', e);
+                        // 필드 조회 실패 시 요청 필드명을 그대로 사용
                     }
                 }
-                // 쿼리: 노트 타입 + 첫 필드 정확 일치 제한
-                const broadQuery = (modelName ? `note:"${modelName}" ` : '') + `field:${primaryField}:"${text}"`;
+                // 쿼리: (옵션)덱 + (옵션)노트 타입 + 첫 필드 정확 일치 제한
+                const deckPart = request.deckName ? `deck:"${request.deckName}" ` : '';
+                const modelPart = modelName ? `note:"${modelName}" ` : '';
+                const broadQuery = deckPart + modelPart + `field:${primaryField}:"${text}"`;
                 const findRes = await fetch(request.ankiConnectUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -177,22 +184,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 // console.log('[Drag2Anki/bg] CHECK_DUPLICATE_EXACT query:', broadQuery, 'primaryField:', primaryField);
                 // console.log('[Drag2Anki/bg] findNotes result ids:', findData?.result);
                 let ids = findData.result;
-                // Fallback: if no ids with field-scoped query, try broad query note+text only
+                // 더 이상 broad fallback을 사용하지 않음: 필드 정확 일치만 중복으로 간주
                 if (!ids || ids.length === 0) {
-                    const fallbackQuery = (modelName ? `note:"${modelName}" ` : '') + `"${text}"`;
-                    // console.log('[Drag2Anki/bg] no ids, fallback query:', fallbackQuery);
-                    const fbRes = await fetch(request.ankiConnectUrl, {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'findNotes', version: 6, params: { query: fallbackQuery } })
-                    });
-                    const fbData = await fbRes.json();
-                    // console.log('[Drag2Anki/bg] fallback ids:', fbData?.result);
-                    ids = fbData.result || [];
-                    if (!ids.length) {
-                        // console.log('[Drag2Anki/bg] duplicate: false (no ids even after fallback)');
-                        sendResponse({ success: true, isDuplicate: false });
-                        return;
-                    }
+                    sendResponse({ success: true, isDuplicate: false });
+                    return;
                 }
                 // 2. notesInfo로 실제 필드값 확인
                 const infoRes = await fetch(request.ankiConnectUrl, {
@@ -254,12 +249,33 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 // Duplicate or other error from Anki
                 const errMsg = String(data.error || 'Unknown error');
                 const isDup = /duplicate/i.test(errMsg) || data.result === null;
+                // Detect invalid field/model errors
+                const looksLikeFieldError = /(field|fields|required|missing|not\s+found)/i.test(errMsg);
+                if (looksLikeFieldError) {
+                    const modelName = request.params?.note?.modelName || request.params?.modelName;
+                    if (modelName) {
+                        return fetch(request.ankiConnectUrl, {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'modelFieldNames', version: 6, params: { modelName } })
+                        })
+                        .then(mr => mr.json())
+                        .then(mf => {
+                            const modelFields = Array.isArray(mf?.result) ? mf.result : [];
+                            return sendResponse({ success: false, invalidFields: true, error: errMsg, modelName, modelFields });
+                        })
+                        .catch(() => sendResponse({ success: false, invalidFields: true, error: errMsg, modelName }));
+                    }
+                    return sendResponse({ success: false, invalidFields: true, error: errMsg });
+                }
                 if (isDup) {
-                    // Try to find existing by Front field from params
-                    const fields = request.params?.note?.fields || request.params?.fields || {};
+                    // Try to find existing by Front field from params, scoped to target deck if provided
+                    const noteObj = request.params?.note || request.params || {};
+                    const fields = noteObj.fields || {};
                     const fieldName = Object.keys(fields)[0] || 'Front';
                     const frontText = (fields[fieldName] || '').toString().trim();
-                    const query = `"${frontText}"`;
+                    const deckName = noteObj.deckName || '';
+                    const deckPart = deckName ? `deck:"${deckName}" ` : '';
+                    const query = deckPart + `"${frontText}"`;
                     return fetch(request.ankiConnectUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -277,18 +293,47 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                             body: JSON.stringify({ action: 'notesInfo', version: 6, params: { notes: ids } })
                         })
                         .then(ir => ir.json())
-                        .then(info => {
+                        .then(async (info) => {
                             const res = info.result || [];
-                            const match = res.find(n => {
+                            // filter by exact front equality
+                            const equalFront = res.filter(n => {
                                 const raw = n.fields?.[fieldName]?.value || '';
                                 const plain = raw.replace(/<[^>]*>/g, '').trim();
                                 return plain === frontText;
-                            }) || res[0] || null;
+                            });
+                            let match = equalFront[0] || res[0] || null;
+                            // if deck specified, refine by deck
+                            if (match && deckName) {
+                                try {
+                                    const candidateIds = equalFront.length ? equalFront.map(n => n.noteId || n.id).filter(Boolean) : ids;
+                                    if (candidateIds && candidateIds.length) {
+                                        const cardIdsRes = await fetch(request.ankiConnectUrl, {
+                                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ action: 'findCards', version: 6, params: { query: `nid:${candidateIds.join(' or nid:')}` } })
+                                        });
+                                        const cardIdsData = await cardIdsRes.json();
+                                        const cardIds = cardIdsData.result || [];
+                                        if (cardIds.length) {
+                                            const cardsInfoRes = await fetch(request.ankiConnectUrl, {
+                                                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ action: 'cardsInfo', version: 6, params: { cards: cardIds } })
+                                            });
+                                            const cardsInfoData = await cardsInfoRes.json();
+                                            const want = (cardsInfoData.result || []).find(c => (c.deckName || '') === deckName);
+                                            if (want) {
+                                                const wantId = want.noteId;
+                                                const exact = res.find(n => (n.noteId || n.id) === wantId);
+                                                if (exact) match = exact;
+                                            }
+                                        }
+                                    }
+                                } catch {}
+                            }
                             const existing = match ? {
                                 id: match.noteId || match.id || ids[0],
                                 modelName: match.modelName,
                                 front: match.fields?.[fieldName]?.value || '',
-                                back: match.fields?.Back?.value || ''
+                                back: (match.fields?.Back?.value || '')
                             } : null;
                             return sendResponse({ success: false, duplicate: true, error: errMsg, existing });
                         });
@@ -315,7 +360,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 // console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT start', { fieldName: request.fieldName, modelName: modelName, text: request.text });
                 // Broad query with model + primary field equality to capture the right note
                 const text = request.text.trim();
-                // 모델의 첫 필드명 조회 (없으면 요청 필드명 사용)
+                // 요청 필드명을 우선 사용. 모델 필드 조회 시 동일 이름(대소문자 무시) 매칭만 정규화.
                 let primaryField = request.fieldName;
                 let modelFields = null; // will be used to resolve Back field later
                 if (modelName) {
@@ -327,14 +372,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                         const mfData = await mfRes.json();
                         if (Array.isArray(mfData?.result) && mfData.result.length > 0) {
                             modelFields = mfData.result;
-                            primaryField = modelFields[0];
+                            const matched = modelFields.find(k => k.toLowerCase() === (primaryField || '').toLowerCase());
+                            if (!matched) {
+                                // 모델에 해당 필드가 없으면 기존 노트 조회 불가
+                                sendResponse({ success: true, result: null });
+                                return;
+                            }
+                            primaryField = matched;
                         }
-                        console.log('[Drag2Anki/bg] model first field:', modelName, '->', primaryField);
+                        console.log('[Drag2Anki/bg] resolved field:', modelName, '->', primaryField);
                     } catch (e) {
-                        // console.warn('[Drag2Anki/bg] modelFieldNames failed, fallback to request.fieldName:', e);
+                        // ignore, keep requested field name
                     }
                 }
-                const query = (modelName ? `note:"${modelName}" ` : '') + `field:${primaryField}:"${text}"`;
+                const deckPart = request.deckName ? `deck:"${request.deckName}" ` : '';
+                const modelPart = modelName ? `note:"${modelName}" ` : '';
+                const query = deckPart + modelPart + `field:${primaryField}:"${text}"`;
                 // 1) findNotes
                 const findRes = await fetch(request.ankiConnectUrl, {
                     method: 'POST',
@@ -345,40 +398,65 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 // console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT query:', query, 'primaryField:', primaryField);
                 // console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT ids:', findData?.result);
                 let ids = findData.result || [];
-                // Fallback to broad query if none
+                // 더 이상 broad fallback을 사용하지 않음: 필드 정확 일치만 조회
                 if (!ids.length) {
-                    const fallbackQuery = (modelName ? `note:"${modelName}" ` : '') + `"${text}"`;
-                    // console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT no ids, fallback query:', fallbackQuery);
-                    const fbRes = await fetch(request.ankiConnectUrl, {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'findNotes', version: 6, params: { query: fallbackQuery } })
-                    });
-                    const fbData = await fbRes.json();
-                    // console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT fallback ids:', fbData?.result);
-                    ids = fbData.result || [];
+                    // console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT no result');
+                    sendResponse({ success: true, result: null });
+                    return;
                 }
                 if (ids.length === 0) {
                     // console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT no result');
                     sendResponse({ success: true, result: null });
                     return;
                 }
-                // 2) notesInfo (첫 번째 노트만 사용)
+                // 2) notesInfo (해당 덱 우선 매칭)
                 const infoRes = await fetch(request.ankiConnectUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'notesInfo', version: 6, params: { notes: ids } })
                 });
                 const infoData = await infoRes.json();
-                // 정확히 첫 필드가 일치하는(HTML 제거 후 텍스트 기준) 첫 노트 선택
+                // 정확히 첫 필드가 일치하는(HTML 제거 후 텍스트 기준) 후보들 필터링
                 const target = text;
-                const matched = (infoData.result || []).find(n => {
+                const candidates = (infoData.result || []).filter(n => {
                     const fieldKeys = Object.keys(n.fields || {});
                     const resolvedKey = fieldKeys.find(k => k.toLowerCase() === (primaryField || '').toLowerCase()) || primaryField;
                     const raw = n.fields?.[resolvedKey]?.value || '';
                     const plain = raw.replace(/<[^>]*>/g, '').trim();
                     return plain === target;
                 });
-                const note = matched || (infoData.result && infoData.result[0]) || null;
+                let note = candidates[0] || (infoData.result && infoData.result[0]) || null;
+                // 덱 지정이 있는 경우, 해당 덱의 노트로 추가 정밀 선택
+                if (note && request.deckName) {
+                    try {
+                        const tmpIds = candidates.length ? candidates.map(n => n.noteId || n.id).filter(Boolean) : ids;
+                        if (tmpIds && tmpIds.length) {
+                            // 각 노트의 첫 카드로 덱 확인
+                            const cardIdsRes = await fetch(request.ankiConnectUrl, {
+                                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'findCards', version: 6, params: { query: `nid:${tmpIds.join(' or nid:')}` } })
+                            });
+                            const cardIdsData = await cardIdsRes.json();
+                            const cardIds = cardIdsData.result || [];
+                            if (cardIds.length) {
+                                const cardsInfoRes = await fetch(request.ankiConnectUrl, {
+                                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ action: 'cardsInfo', version: 6, params: { cards: cardIds } })
+                                });
+                                const cardsInfoData = await cardsInfoRes.json();
+                                const match = (cardsInfoData.result || []).find(c => (c.deckName || '') === request.deckName);
+                                if (match) {
+                                    // 해당 카드의 노트 id로 note 선택
+                                    const wantId = match.noteId;
+                                    const exact = (infoData.result || []).find(n => (n.noteId || n.id) === wantId);
+                                    if (exact) note = exact;
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        // 덱 해상도 실패 시 최초 후보 유지
+                    }
+                }
                 if (!note) {
                     // console.log('[Drag2Anki/bg] GET_EXISTING_BY_FRONT notesInfo empty');
                     sendResponse({ success: true, result: null });
@@ -393,7 +471,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 const front = note.fields?.[resolvedKey]?.value || '';
                 const back = note.fields?.[backResolved]?.value || '';
                 
-                // 덱 이름을 가져오기 위해 카드 정보 조회
+                // 덱 이름을 가져오기 위해 카드 정보 조회 (지정 덱 우선)
                 let deckName = '';
                 try {
                     const noteId = note.noteId || note.id || ids[0];
@@ -486,6 +564,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         fetchWithCORS(request.url, request.options)
             .then(response => sendResponse(response))
             .catch(error => sendResponse({ error: error.message }));
+        return true;
+    }
+    else if (request.type === 'GET_MODEL_FIELDS') {
+        const modelName = request.modelName;
+        if (!modelName) {
+            sendResponse({ success: false, error: 'modelName is required' });
+            return true;
+        }
+        fetch(request.ankiConnectUrl, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'modelFieldNames', version: 6, params: { modelName } })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data && data.error) {
+                sendResponse({ success: false, error: data.error });
+            } else {
+                sendResponse({ success: true, result: Array.isArray(data.result) ? data.result : [] });
+            }
+        })
+        .catch(err => sendResponse({ success: false, error: err.message }));
         return true;
     }
 });
