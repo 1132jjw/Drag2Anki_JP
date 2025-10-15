@@ -3,6 +3,8 @@
 > 일본어와 영어 학습을 위한 올인원 크롬 익스텐션  
 > 드래그로 번역하고 Anki 카드로 바로 저장!
 
+[크롬 익스텐션 링크](https://chromewebstore.google.com/detail/%EB%93%9C%EB%9E%98%EA%B7%B8-%EB%8B%A8%EC%96%B4%EC%9E%A5-%EB%93%9C%EB%9E%98%EA%B7%B8%ED%95%98%EA%B3%A0-%EB%B2%88%EC%97%AD%ED%95%B4%EC%84%9C-anki%EC%97%90/cjkjogijaikhhigfakfpgahijkjbbhdb?hl=ko)
+
 ---
 
 ## ✨ 주요 기능
